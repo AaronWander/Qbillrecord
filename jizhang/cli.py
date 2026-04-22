@@ -8,6 +8,8 @@ from jizhang import __version__
 from jizhang.env import load_dotenv
 from jizhang.pipeline.config import load_pipeline
 from jizhang.pipeline.errors import ConfigError
+from jizhang.steps import builtins as _builtins  # noqa: F401
+from jizhang.registry import REGISTRY
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -31,8 +33,11 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _cmd_list(_args: argparse.Namespace) -> int:
-    print("Built-ins are not wired yet (Task 5/6).")
-    print("Next: implement registry + built-in steps.")
+    for kind in REGISTRY.kinds():
+        print(f"{kind}:")
+        for reg in REGISTRY.types_for(kind):
+            desc = f" - {reg.description}" if reg.description else ""
+            print(f"  - {reg.type_id}{desc}")
     return 0
 
 
