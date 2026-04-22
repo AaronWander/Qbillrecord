@@ -12,6 +12,12 @@ python -m jizhang doctor --pipeline pipelines/icbc95588_inc.yml
 python -m jizhang run --pipeline pipelines/icbc95588_inc.yml
 ```
 
+## Pipelines
+
+Pipelines are YAML files under `pipelines/`. They select built-in step implementations by `type`.
+
+Environment variables may be referenced only via `*_env/*_ENV` keys (no `${VAR}` interpolation).
+
 ## Configuration
 
 ### 1) Pipeline YAML (no secrets)
@@ -44,4 +50,3 @@ These artifacts may include sensitive personal financial data and are ignored by
 
 The repo is currently being rebuilt from a set of scripts into a mature `python -m jizhang` CLI driven by YAML pipelines. See:
 - `docs/plans/2026-04-22-cli-pipeline-rebuild-design.md`
-

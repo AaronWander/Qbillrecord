@@ -12,6 +12,9 @@ from typing import Any
 
 from jizhang.pipeline.config import PipelineConfig
 from jizhang.pipeline.errors import ConfigError, JizhangError
+from jizhang.registry import REGISTRY
+from jizhang.steps.base import RunContext, Sink, StateStore, Source, Transform
+from jizhang.steps import builtins as _builtins  # noqa: F401
 
 
 def _ts() -> str:
@@ -100,140 +103,87 @@ def run_pipeline(cfg: PipelineConfig) -> RunResult:
         manifest["elapsed_ms"] = int((time.time() - started) * 1000)
         (run_dir / "run_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-    # Resolve required types (we keep it explicit in v1)
-    state = raw.get("state") or {}
-    source = raw.get("source") or {}
-    parser = raw.get("parser") or {}
-    classifier = raw.get("classifier") or {}
-    exporter = raw.get("exporter") or {}
-    sink = raw.get("sink") or {}
+    state_cfg = raw.get("state") or {}
+    source_cfg = raw.get("source") or {}
+    classifier_cfg = raw.get("classifier") or {}
+    exporter_cfg = raw.get("exporter") or {}
+    sink_cfg = raw.get("sink") or {}
 
-    state_type = str(state.get("type") or "")
-    source_type = str(source.get("type") or "")
-    parser_type = str(parser.get("type") or "")
-    classifier_type = str(classifier.get("type") or "")
-    exporter_type = str(exporter.get("type") or "")
-    sink_type = str(sink.get("type") or "")
-
-    supported = {
-        ("state", "rowid_watermark"),
-        ("source", "imessage_sqlite"),
-        ("parser", "icbc95588_sms"),
-        ("classifier", "rules_ai"),
-        ("exporter", "firefly_jsonl"),
-        ("sink", "firefly_api"),
-    }
-    requested = {
-        ("state", state_type),
-        ("source", source_type),
-        ("parser", parser_type),
-        ("classifier", classifier_type),
-        ("exporter", exporter_type),
-        ("sink", sink_type),
-    }
-    unsupported = sorted([f"{k}:{t}" for (k, t) in requested if (k, t) not in supported])
-    if unsupported:
+    if not isinstance(state_cfg, dict) or not isinstance(source_cfg, dict) or not isinstance(classifier_cfg, dict) or not isinstance(exporter_cfg, dict) or not isinstance(sink_cfg, dict):
         _write_manifest(2)
-        raise ConfigError(f"Unsupported step types (v1 runner): {', '.join(unsupported)}")
+        raise ConfigError("Pipeline sections must be objects: state/source/classifier/exporter/sink")
 
-    # 1) State: load watermark
-    state_path = Path(str(state.get("path") or "exports/95588_state.json"))
-    last_rowid = _load_rowid_state(state_path)
-    manifest["state"] = {"path": str(state_path), "last_rowid": last_rowid}
+    state_type = str(state_cfg.get("type") or "").strip()
+    source_type = str(source_cfg.get("type") or "").strip()
+    transform_type = str(classifier_cfg.get("type") or "").strip()
+    sink_type = str(sink_cfg.get("type") or "").strip()
+    if not state_type or not source_type or not transform_type or not sink_type:
+        _write_manifest(2)
+        raise ConfigError("Pipeline must set type for: state/source/classifier/sink")
+
+    try:
+        state_store = REGISTRY.create(kind="state", type_id=state_type, config=state_cfg)
+        source_step = REGISTRY.create(kind="source", type_id=source_type, config=source_cfg)
+        transform_step = REGISTRY.create(
+            kind="transform",
+            type_id=transform_type,
+            config={"rules_path": classifier_cfg.get("rules_path"), "ai": classifier_cfg.get("ai"), "exporter": exporter_cfg},
+        )
+        sink_step = REGISTRY.create(kind="sink", type_id=sink_type, config=sink_cfg)
+    except KeyError as e:
+        _write_manifest(2)
+        raise ConfigError(str(e)) from e
+
+    if not isinstance(state_store, StateStore) or not isinstance(source_step, Source) or not isinstance(transform_step, Transform) or not isinstance(sink_step, Sink):
+        _write_manifest(2)
+        raise ConfigError("Step registration returned wrong types")
+
+    state_obj = state_store.load()
+    last_rowid = int(state_obj.get("last_rowid") or 0) if isinstance(state_obj, dict) else 0
+    manifest["state"] = {"type": state_type, "last_rowid": last_rowid}
     print(f"[run] last_rowid={last_rowid}", file=sys.stderr, flush=True)
 
-    # 2) Source: export delta to run_dir/raw.jsonl
-    from jizhang.ingest.imessage import iter_sender_messages, write_jsonl
-    from jizhang.ingest.validate import validate as validate_export
-
-    sender = str(source.get("sender") or "95588")
-    db_path = os.path.expanduser(str(source.get("db_path") or ""))
-    raw_out = run_dir / "raw.jsonl"
-
-    count = write_jsonl(
-        iter_sender_messages(
-            db_path=db_path,
-            sender_like=f"%{sender}%",
-            since_rowid=int(last_rowid),
-        ),
-        raw_out,
+    ctx = RunContext(
+        run_dir=run_dir,
+        audit_dir=audit_dir,
+        raw_path=run_dir / "raw.jsonl",
+        firefly_path=run_dir / "firefly.jsonl",
+        push_state_path=run_dir / "push_state.jsonl",
+        manifest=manifest,
     )
-    print(f"[run] exported messages={count} to {raw_out}", file=sys.stderr, flush=True)
 
-    new_max = _max_rowid_in_jsonl(raw_out)
-    manifest["source"] = {"sender": sender, "db_path": db_path, "raw_out": str(raw_out), "rowid_max": new_max}
+    src_meta = source_step.export(ctx=ctx, state=state_obj)
+    manifest["source"] = {"type": source_type, **(src_meta or {})}
+    new_max = int((src_meta or {}).get("rowid_max") or 0)
+    if int((src_meta or {}).get("alerts") or 0) > 0:
+        _write_manifest(2)
+        print("[run] export anomalies found; abort before transform/push/state update.", file=sys.stderr, flush=True)
+        return RunResult(rc=2, run_dir=run_dir)
     if new_max <= last_rowid:
-        # no new messages
         _write_manifest(0)
         print("[run] no new messages; nothing to do.", file=sys.stderr, flush=True)
         return RunResult(rc=0, run_dir=run_dir)
 
-    alerts = validate_export(str(raw_out))
-    if alerts:
-        alerts_path = run_dir / "export_alerts.jsonl"
-        alerts_path.write_text("\n".join(json.dumps(a, ensure_ascii=False) for a in alerts) + "\n", encoding="utf-8")
-        _write_manifest(2)
-        print(f"[run] export anomalies found; saved {len(alerts)} alerts to {alerts_path}.", file=sys.stderr, flush=True)
-        return RunResult(rc=2, run_dir=run_dir)
-
     # 3) Parse + classify + export
     from jizhang.transform.icbc95588_pipeline import run_pipeline as transform_run
 
-    rules_path = str(classifier.get("rules_path") or "")
-    ai_cfg = classifier.get("ai") or {}
-    ai_enabled = bool(ai_cfg.get("enabled", False))
-
-    firefly_out = run_dir / "firefly.jsonl"
     _ensure_dir(audit_dir)
-
-    pipe_rc = int(
-        transform_run(
-            in_path=str(raw_out),
-            rules_path=rules_path,
-            firefly_out=str(firefly_out),
-            audit_dir=str(audit_dir),
-            tz=str(exporter.get("tz") or "+08:00"),
-            asset_prefix=str(exporter.get("asset_prefix") or "工商银行"),
-            no_ai=(not ai_enabled),
-            apply_rules=bool(exporter.get("apply_rules", False)),
-        )
-        or 0
-    )
-    manifest["transform"] = {
-        "rules_path": rules_path,
-        "ai_enabled": ai_enabled,
-        "firefly_out": str(firefly_out),
-        "audit_dir": str(audit_dir),
-        "rc": pipe_rc,
-    }
+    pipe_rc = int(transform_step.run(ctx=ctx) or 0)
+    manifest["transform"] = {"type": transform_type, "rc": pipe_rc, "firefly_out": str(ctx.firefly_path), "audit_dir": str(audit_dir)}
     if pipe_rc != 0:
         _write_manifest(pipe_rc)
         print(f"[run] pipeline failed rc={pipe_rc}; abort before push/state update.", file=sys.stderr, flush=True)
         return RunResult(rc=pipe_rc, run_dir=run_dir)
 
     # 4) Sink: push to Firefly
-    from jizhang.sink.firefly import push_firefly_jsonl
-
-    push_state = run_dir / "push_state.jsonl"
-    summary = push_firefly_jsonl(
-        in_path=firefly_out,
-        state_path=push_state,
-        base_url=str(sink.get("base_url") or ""),
-        token=str(sink.get("token") or ""),
-        timeout_s=int(sink.get("timeout_s") or 30),
-        retries=int(sink.get("retries") or 3),
-        retry_sleep_s=float(sink.get("retry_sleep_s") or 1.5),
-        bootstrap_assets=bool(sink.get("bootstrap_assets", False)),
-        skip_using_state=True,
-        no_error_if_duplicate=bool(sink.get("no_error_if_duplicate", False)),
-        dry_run=bool(sink.get("dry_run", False)),
-        limit=int(sink.get("limit") or 0),
-    )
-    manifest["sink"] = {"type": sink_type, "push_state": str(push_state), "summary": summary.__dict__}
+    summary = sink_step.push(ctx=ctx)
+    manifest["sink"] = {"type": sink_type, "push_state": str(ctx.push_state_path), "summary": summary}
 
     # 5) Update watermark state
-    _save_rowid_state(state_path, new_max)
-    manifest["state"]["new_last_rowid"] = new_max
+    if isinstance(state_obj, dict):
+        state_obj["last_rowid"] = new_max
+    state_store.save(state_obj)
+    manifest["state"]["new_last_rowid"] = int(new_max)
 
     _write_manifest(0)
     print(f"[run] state updated last_rowid={new_max}", file=sys.stderr, flush=True)

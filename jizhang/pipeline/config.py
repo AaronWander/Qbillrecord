@@ -65,7 +65,7 @@ def _resolve_env_refs(obj: Any, *, env: dict[str, str]) -> Any:
 
 
 def _validate_required_top_keys(cfg: dict[str, Any]) -> None:
-    required = ["name", "artifacts_dir", "state", "source", "parser", "classifier", "exporter", "sink"]
+    required = ["name", "artifacts_dir", "state", "source", "classifier", "exporter", "sink"]
     missing = [k for k in required if k not in cfg]
     if missing:
         raise ConfigError(f"Pipeline config missing required keys: {', '.join(missing)}")

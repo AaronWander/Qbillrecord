@@ -1,11 +1,11 @@
 # jizhang：95588 → Firefly 流水线架构梳理
 
-本仓库当前形态是“一组可组合的脚本”。它已经具备清晰的端到端链路，但缺少统一入口、统一数据模型与文档化边界，导致体感“散”。
-本文把脚本按**控制面（编排）/执行面（处理）/扩展面（规则&配置）**梳理成一个可演进的项目结构，并给出关键链路图、产物与后续项目化方向。
+本仓库当前形态是一个 **`python -m jizhang`** 驱动的 CLI 项目，采用“pipeline（可替换步骤）”的方式组织：source → transform → sink。
+它具备清晰的端到端链路，并通过 YAML pipeline 配置实现输入源/解析规则/分类规则/输出端的可替换与扩展。
 
 ## 1. 一句话定位（Why / What）
 
-从 macOS iMessage（sender=95588）导出银行短信 → 用规则解析并分类 → 用 AI 补全“待分类” → 导出 Firefly III 交易 JSONL → 通过 API 推送入账，并支持增量水位与可回放产物归档。
+从输入源导出原始消息（当前内置：macOS iMessage sender=95588）→ 解析+规则分类 → 可选 AI 补全“待分类” → 导出 Firefly III 交易 JSONL → 通过 API 推送入账，并支持增量水位与可回放产物归档。
 
 ## 2. 边界与非目标（Scope）
 
@@ -27,21 +27,20 @@
 ### 3.1 分层视图
 
 - **控制面 / 编排层**
-  - `scripts/jizhang.py`：交互式菜单入口（人手动跑）
-  - `scripts/run_incremental_95588_to_firefly.py`：增量端到端编排（可自动化）
-  - `scripts/pipeline_95588_classify_with_ai.py`：分类+AI+导出（不含推送）
+  - `jizhang/cli.py`：统一 CLI（`python -m jizhang ...`）
+  - `jizhang/pipeline/runner.py`：pipeline 编排与 run artifacts
 
-- **执行面 / 处理层**
-  - 导出：`scripts/export_imessage_sender.py`（从 `chat.db` 到 JSONL）
-  - 解析+规则分类：`scripts/classify_95588_jsonl_to_md.py`（短信 → ParsedTxn → 分类/报告）
-  - AI 补全：`scripts/ai_classify_from_classified.py`（读取 markdown 待分类 → DeepSeek）
-  - Firefly 导出：`scripts/export_firefly_transactions_from_jsonl.py`（ParsedTxn → Firefly payload JSONL）
-  - 推送：`scripts/push_firefly_jsonl.py`（JSONL → Firefly API）
+- **执行面 / 处理层（可替换 steps）**
+  - state：`jizhang/steps/state_rowid.py`
+  - source：`jizhang/steps/source_imessage.py`
+  - transform：`jizhang/steps/transform_icbc95588.py`（内部调用 `jizhang/transform/icbc95588_pipeline.py`）
+  - sink：`jizhang/steps/sink_firefly.py`
 
 - **扩展面 / 配置&规则**
-  - 规则与 taxonomy：`rules/icbc_95588_rules.json`
+  - Pipeline 配置：`pipelines/*.yml`
+  - 规则与 taxonomy：`rules/*.json`
   - 环境变量：`.env` / `.env.example`
-  - 产物目录：`exports/`、`reports/`
+  - 产物目录：`exports/`（默认不进 git）
 
 ### 3.2 组件职责表（“脚本即组件”）
 

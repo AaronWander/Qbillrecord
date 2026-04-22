@@ -10,11 +10,8 @@ source:
   sender: "95588"
   db_path: "~/Library/Messages/chat.db"
 
-parser:
-  type: icbc95588_sms
-
 classifier:
-  type: rules_ai
+  type: icbc95588_rules_ai
   rules_path: rules/icbc_95588_rules.json
   ai:
     enabled: true
@@ -38,4 +35,3 @@ sink:
   idempotency:
     state_path: push_state.jsonl
     server_duplicate_hash: true
-
