@@ -1,0 +1,893 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Workflow (React Preview)</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <!-- React 18 (UMD) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+    <!-- Babel (so we can run the JSX as-is in a single HTML file) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/babel">
+      const { useState, useEffect } = React;
+
+      const agents = [
+        {
+          id: "claude",
+          name: "CLAUDE",
+          role: "Chief Executive Officer",
+          subtitle: "Strategic Brain",
+          icon: " ",
+          color: "#D4AF37",
+          glow: "#D4AF3722",
+          tasks: [
+            "Strategic planning & vision",
+            "Brand voice & messaging",
+            "Content architecture",
+            "Decision synthesis",
+            "Campaign orchestration",
+          ],
+          x: 50,
+          y: 9,
+        },
+        {
+          id: "manus",
+          name: "MANUS",
+          role: "Chief Operating Officer",
+          subtitle: "Autonomous Executor",
+          icon: " ",
+          color: "#4FC3F7",
+          glow: "#4FC3F722",
+          tasks: [
+            "API key & .env execution",
+            "Make.com scenario control",
+            "GHL / CRM automation",
+            "Stripe payment routing",
+            "SmartLeads outreach ops",
+          ],
+          x: 82,
+          y: 38,
+        },
+        {
+          id: "gemini",
+          name: "GEMINI",
+          role: "Intelligence Engine",
+          subtitle: "Research & Prospecting",
+          icon: " ",
+          color: "#69F0AE",
+          glow: "#69F0AE22",
+          tasks: [
+            "YouTube channel prospecting",
+            "Google Business scraping",
+            "State bar directory mining",
+            "43-state attorney database",
+            "Market intelligence reports",
+          ],
+          x: 18,
+          y: 38,
+        },
+        {
+          id: "grok",
+          name: "GROK",
+          role: "Signal Intelligence",
+          subtitle: "X Algorithm Operator",
+          icon: " ",
+          color: "#CE93D8",
+          glow: "#CE93D822",
+          tasks: [
+            "X / Twitter trend analysis",
+            "Viral signal detection",
+            "Content timing optimization",
+            "Audience engagement data",
+            "Real-time cultural pulse",
+          ],
+          x: 50,
+          y: 65,
+        },
+        {
+          id: "openclaw",
+          name: "OPENCLAW",
+          role: "Infrastructure Gateway",
+          subtitle: "Local Nervous System",
+          icon: " ",
+          color: "#FF7043",
+          glow: "#FF704322",
+          tasks: [
+            "Runs 24/7 on Mac Mini (buddhabrainai)",
+            "Routes Telegram → all agents",
+            "Shell commands & browser control",
+            "Local file read/write/memory",
+            "Multi-agent session routing",
+            "Skills system — 100+ capabilities",
+          ],
+          x: 50,
+          y: 90,
+        },
+      ];
+
+      const entities = [
+        {
+          name: "Buddha Digital Temple",
+          abbr: "BDT",
+          type: "508(c)(1)(A)",
+          value: "$8.0B FMV",
+          color: "#D4AF37",
+          icon: " ",
+        },
+        {
+          name: "Smart Money Media AI",
+          abbr: "SMMAI",
+          type: "508(c)(1)(A)",
+          value: "10+ Magazine Brands",
+          color: "#4FC3F7",
+          icon: " ",
+        },
+        {
+          name: "Dunamis Charge",
+          abbr: "DC",
+          type: "C-Corp",
+          value: "EV Charging • Detroit",
+          color: "#69F0AE",
+          icon: " ",
+        },
+      ];
+
+      function AgentCard({ agent, active, onClick }) {
+        const isOpenClaw = agent.id === "openclaw";
+        return (
+          <div
+            onClick={() => onClick(agent.id)}
+            style={{
+              position: "absolute",
+              left: `${agent.x}%`,
+              top: `${agent.y}%`,
+              transform: "translate(-50%, -50%)",
+              cursor: "pointer",
+              zIndex: 10,
+              width: isOpenClaw ? (active ? 270 : 210) : undefined,
+            }}
+          >
+            <div
+              style={{
+                background: active ? agent.glow : "rgba(10,12,20,0.92)",
+                border: `1.5px solid ${
+                  active ? agent.color : agent.color + "55"
+                }`,
+                borderRadius: isOpenClaw ? 40 : 16,
+                padding: isOpenClaw ? "10px 20px" : "14px 18px",
+                minWidth: isOpenClaw ? undefined : 145,
+                boxShadow: active
+                  ? `0 0 36px ${agent.color}55, 0 0 10px ${agent.color}33`
+                  : isOpenClaw
+                    ? `0 0 30px ${agent.color}33, inset 0 0 20px ${agent.color}11`
+                    : `0 0 12px ${agent.color}22`,
+                transition: "all 0.3s ease",
+                textAlign: "center",
+              }}
+            >
+              {isOpenClaw && !active ? (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 10,
+                  }}
+                >
+                  <span style={{ fontSize: 20 }}>{agent.icon}</span>
+                  <div>
+                    <div
+                      style={{
+                        fontFamily: "monospace",
+                        fontWeight: 800,
+                        fontSize: 11,
+                        letterSpacing: 3,
+                        color: agent.color,
+                      }}
+                    >
+                      {agent.name}
+                    </div>
+                    <div style={{ fontSize: 9, color: "#bbb" }}>
+                      {agent.role} · {agent.subtitle}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: "50%",
+                      background: "#4CAF50",
+                      boxShadow: "0 0 8px #4CAF50",
+                      flexShrink: 0,
+                    }}
+                  />
+                </div>
+              ) : (
+                <>
+                  <div
+                    style={{
+                      fontSize: isOpenClaw ? 22 : 26,
+                      marginBottom: 4,
+                    }}
+                  >
+                    {agent.icon}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: "monospace",
+                      fontWeight: 800,
+                      fontSize: isOpenClaw ? 11 : 13,
+                      letterSpacing: 3,
+                      color: agent.color,
+                      marginBottom: 2,
+                    }}
+                  >
+                    {agent.name}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: "#fff",
+                      opacity: 0.9,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {agent.role}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 9,
+                      color: agent.color,
+                      opacity: 0.75,
+                      marginTop: 2,
+                    }}
+                  >
+                    {agent.subtitle}
+                  </div>
+                  {active && (
+                    <div style={{ marginTop: 10, textAlign: "left" }}>
+                      {agent.tasks.map((t, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            fontSize: 9,
+                            color: "#e0e0e0",
+                            padding: "2px 0",
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: 5,
+                            lineHeight: 1.4,
+                          }}
+                        >
+                          <span style={{ color: agent.color, flexShrink: 0 }}>
+                            ›
+                          </span>
+                          {t}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      function AIWorkflow() {
+        const [active, setActive] = useState("claude");
+        const [tick, setTick] = useState(0);
+        useEffect(() => {
+          const interval = setInterval(() => setTick((t) => (t + 1) % 100), 80);
+          return () => clearInterval(interval);
+        }, []);
+        const handleClick = (id) => setActive(id === active ? null : id);
+        const W = 800,
+          H = 560;
+        const pos = {};
+        agents.forEach((a) => {
+          pos[a.id] = { x: (a.x / 100) * W, y: (a.y / 100) * H };
+        });
+        const connections = [
+          { from: "claude", to: "manus" },
+          { from: "claude", to: "gemini" },
+          { from: "claude", to: "grok" },
+          { from: "manus", to: "grok" },
+          { from: "gemini", to: "grok" },
+          { from: "openclaw", to: "claude" },
+          { from: "openclaw", to: "manus" },
+          { from: "openclaw", to: "gemini" },
+          { from: "openclaw", to: "grok" },
+        ];
+        const pulseRoutes = [
+          { from: "claude", to: "manus", offset: 0 },
+          { from: "gemini", to: "claude", offset: 33 },
+          { from: "grok", to: "claude", offset: 66 },
+          { from: "openclaw", to: "claude", offset: 15 },
+          { from: "openclaw", to: "manus", offset: 50 },
+          { from: "openclaw", to: "gemini", offset: 80 },
+        ];
+        return (
+          <div
+            style={{
+              minHeight: "100vh",
+              background: "#04050d",
+              backgroundImage: `
+ radial-gradient(ellipse at 50% 0%, #1a1200 0%, transparent 60%),
+ radial-gradient(ellipse at 100% 100%, #001a1a 0%, transparent 50%),
+ radial-gradient(ellipse at 0% 100%, #0d001a 0%, transparent 50%)
+ `,
+              fontFamily: "'Georgia', serif",
+              color: "#fff",
+              padding: "0 0 60px",
+            }}
+          >
+            {/* Header */}
+            <div style={{ textAlign: "center", padding: "28px 20px 8px" }}>
+              <div
+                style={{
+                  background: "linear-gradient(135deg, #D4AF37, #FFF8DC, #D4AF37)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  fontFamily: "monospace",
+                  fontWeight: 900,
+                  fontSize: 10,
+                  letterSpacing: 5,
+                  marginBottom: 8,
+                }}
+              >
+                BUDDHA DIGITAL TEMPLE · SMMAI · DUNAMIS
+              </div>
+              <h1
+                style={{
+                  margin: "0 0 6px",
+                  fontWeight: 700,
+                  fontSize: 24,
+                  color: "#fff",
+                  letterSpacing: 1,
+                }}
+              >
+                Unified AI Agent Architecture
+              </h1>
+              <div
+                style={{
+                  color: "#D4AF3799",
+                  fontSize: 10,
+                  letterSpacing: 2,
+                  fontFamily: "monospace",
+                }}
+              >
+                COMMAND · INTELLIGENCE · EXECUTION · SIGNAL · INFRASTRUCTURE
+              </div>
+            </div>
+            {/* Flow Bar */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                gap: 8,
+                margin: "14px 0 8px",
+                flexWrap: "wrap",
+                padding: "0 20px",
+              }}
+            >
+              {[
+                { label: "TELEGRAM", sub: "20 Commands", icon: " ", color: "#29B6F6" },
+                { label: "OPENCLAW", sub: "Local Gateway", icon: " ", color: "#FF7043" },
+                { label: "5 AI AGENTS", sub: "Claude · Manus · Gemini · Grok", icon: " ", color: "#D4AF37" },
+              ].map((item, i) => (
+                <>
+                  <div
+                    key={i}
+                    style={{
+                      background: `linear-gradient(135deg, #0a0a0f, #111118)`,
+                      border: `1.5px solid ${item.color}88`,
+                      borderRadius: 30,
+                      padding: "7px 16px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 7,
+                      boxShadow: `0 0 16px ${item.color}22`,
+                    }}
+                  >
+                    <span style={{ fontSize: 14 }}>{item.icon}</span>
+                    <div>
+                      <div
+                        style={{
+                          fontFamily: "monospace",
+                          fontWeight: 800,
+                          fontSize: 9,
+                          color: item.color,
+                          letterSpacing: 2,
+                        }}
+                      >
+                        {item.label}
+                      </div>
+                      <div style={{ fontSize: 7, color: "#888" }}>{item.sub}</div>
+                    </div>
+                    {i === 0 && (
+                      <div
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: "50%",
+                          background: "#4CAF50",
+                          boxShadow: "0 0 6px #4CAF50",
+                        }}
+                      />
+                    )}
+                  </div>
+                  {i < 2 && (
+                    <span
+                      key={`arrow-${i}`}
+                      style={{ color: "#ffffff33", fontSize: 14 }}
+                    >
+                      →
+                    </span>
+                  )}
+                </>
+              ))}
+            </div>
+            {/* Main Diagram */}
+            <div style={{ maxWidth: 860, margin: "0 auto", padding: "0 20px" }}>
+              <div
+                style={{
+                  position: "relative",
+                  height: 560,
+                  background: "rgba(255,255,255,0.015)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  borderRadius: 20,
+                  overflow: "hidden",
+                }}
+              >
+                {/* OpenClaw foundation glow */}
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: 0,
+                    left: "10%",
+                    right: "10%",
+                    height: 130,
+                    background:
+                      "radial-gradient(ellipse at center bottom, #FF704320 0%, transparent 70%)",
+                    pointerEvents: "none",
+                  }}
+                />
+                {/* Layer labels */}
+                <div
+                  style={{
+                    position: "absolute",
+                    left: 14,
+                    top: 0,
+                    bottom: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-around",
+                    pointerEvents: "none",
+                  }}
+                >
+                  {["STRATEGY", "EXECUTION", "SIGNAL", "GATEWAY"].map((l, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        fontSize: 7,
+                        fontFamily: "monospace",
+                        letterSpacing: 2,
+                        color: ["#D4AF3433", "#4FC3F733", "#CE93D833", "#FF704333"][i],
+                        writingMode: "vertical-rl",
+                        transform: "rotate(180deg)",
+                      }}
+                    >
+                      {l}
+                    </div>
+                  ))}
+                </div>
+                {/* SVG */}
+                <svg
+                  width="100%"
+                  height="100%"
+                  viewBox={`0 0 ${W} ${H}`}
+                  style={{ position: "absolute", inset: 0 }}
+                >
+                  <ellipse
+                    cx={pos.openclaw?.x}
+                    cy={pos.openclaw?.y}
+                    rx="165"
+                    ry="24"
+                    fill="none"
+                    stroke="#FF704322"
+                    strokeWidth="1"
+                    strokeDasharray="4 5"
+                  />
+                  {connections.map((c, i) => {
+                    const f = pos[c.from],
+                      t = pos[c.to];
+                    if (!f || !t) return null;
+                    const isOC = c.from === "openclaw";
+                    const color = isOC
+                      ? "#FF704344"
+                      : agents.find((a) => a.id === c.from)?.color + "44";
+                    return (
+                      <line
+                        key={i}
+                        x1={f.x}
+                        y1={f.y}
+                        x2={t.x}
+                        y2={t.y}
+                        stroke={color}
+                        strokeWidth={isOC ? 1 : 1.5}
+                        strokeDasharray={isOC ? "3 5" : "6 4"}
+                      />
+                    );
+                  })}
+                  {pulseRoutes.map((c, i) => {
+                    const f = pos[c.from],
+                      t = pos[c.to];
+                    if (!f || !t) return null;
+                    const prog = ((tick + c.offset) % 100) / 100;
+                    const cx = f.x + (t.x - f.x) * prog;
+                    const cy = f.y + (t.y - f.y) * prog;
+                    const color =
+                      c.from === "openclaw"
+                        ? "#FF7043"
+                        : agents.find((a) => a.id === c.from)?.color;
+                    return (
+                      <circle
+                        key={i}
+                        cx={cx}
+                        cy={cy}
+                        r={3.5}
+                        fill={color}
+                        style={{ filter: `drop-shadow(0 0 5px ${color})` }}
+                      />
+                    );
+                  })}
+                </svg>
+                {agents.map((agent) => (
+                  <AgentCard
+                    key={agent.id}
+                    agent={agent}
+                    active={active === agent.id}
+                    onClick={handleClick}
+                  />
+                ))}
+              </div>
+              <div
+                style={{
+                  textAlign: "center",
+                  marginTop: 7,
+                  color: "#444",
+                  fontSize: 8,
+                  letterSpacing: 2,
+                  fontFamily: "monospace",
+                }}
+              >
+                TAP ANY AGENT TO EXPAND · OPENCLAW RUNS 24/7 AS THE FOUNDATION ON MAC MINI
+              </div>
+              {/* OpenClaw Callout */}
+              <div
+                style={{
+                  marginTop: 18,
+                  background: "linear-gradient(135deg, #140800, #1e0c00)",
+                  border: "1.5px solid #FF704344",
+                  borderRadius: 16,
+                  padding: "14px 18px",
+                  boxShadow: "0 0 24px #FF704311",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    marginBottom: 12,
+                  }}
+                >
+                  <span style={{ fontSize: 22 }}> </span>
+                  <div>
+                    <div
+                      style={{
+                        fontFamily: "monospace",
+                        fontWeight: 800,
+                        fontSize: 11,
+                        color: "#FF7043",
+                        letterSpacing: 2,
+                      }}
+                    >
+                      OPENCLAW — LOCAL INFRASTRUCTURE GATEWAY
+                    </div>
+                    <div style={{ fontSize: 8, color: "#888", marginTop: 2 }}>
+                      Open-source · Self-hosted on buddhabrainai Mac Mini · Powered by Claude API
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      marginLeft: "auto",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 5,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        background: "#4CAF50",
+                        boxShadow: "0 0 6px #4CAF50",
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize: 8,
+                        color: "#4CAF50",
+                        fontFamily: "monospace",
+                      }}
+                    >
+                      24/7 ONLINE
+                    </span>
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                  {[
+                    { label: "Telegram Routing", desc: "20 commands → right agent", icon: " " },
+                    { label: "Shell Execution", desc: "Scripts, deploy, local files", icon: " " },
+                    { label: "Skills System", desc: "100+ tools, self-writes new ones", icon: " " },
+                    { label: "Persistent Memory", desc: "Context across all sessions", icon: " " },
+                    { label: "Browser Control", desc: "Web scraping on demand", icon: " " },
+                    { label: "Multi-Agent Router", desc: "Isolated sessions per agent", icon: " " },
+                  ].map((f, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        background: "rgba(255,112,67,0.05)",
+                        border: "1px solid #FF704322",
+                        borderRadius: 10,
+                        padding: "9px 10px",
+                      }}
+                    >
+                      <div style={{ fontSize: 15, marginBottom: 3 }}>{f.icon}</div>
+                      <div style={{ fontSize: 9, fontWeight: 700, color: "#FF7043" }}>
+                        {f.label}
+                      </div>
+                      <div style={{ fontSize: 7, color: "#777", marginTop: 2, lineHeight: 1.4 }}>
+                        {f.desc}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Integrations */}
+              <div style={{ marginTop: 20 }}>
+                <div
+                  style={{
+                    textAlign: "center",
+                    fontFamily: "monospace",
+                    fontSize: 8,
+                    letterSpacing: 4,
+                    color: "#D4AF3766",
+                    marginBottom: 10,
+                  }}
+                >
+                  FULL INTEGRATION STACK
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                  {[
+                    { name: "Telegram", desc: "20 Commands · Hub", icon: " ", color: "#29B6F6" },
+                    { name: "OpenClaw", desc: "Local Gateway · Mac Mini", icon: " ", color: "#FF7043" },
+                    { name: "Make.com", desc: "6 Active Scenarios", icon: " ", color: "#FFA726" },
+                    { name: "SmartLeads", desc: "Cold Outreach", icon: " ", color: "#66BB6A" },
+                    { name: "GHL", desc: "CRM & Pipeline", icon: " ", color: "#AB47BC" },
+                    { name: "Stripe", desc: "Payment Processing", icon: " ", color: "#5C6BC0" },
+                  ].map((intg, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        background: "rgba(255,255,255,0.02)",
+                        border: `1px solid ${intg.color}33`,
+                        borderRadius: 10,
+                        padding: "9px 10px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <span style={{ fontSize: 16 }}>{intg.icon}</span>
+                      <div>
+                        <div
+                          style={{
+                            fontFamily: "monospace",
+                            fontWeight: 700,
+                            fontSize: 9,
+                            color: intg.color,
+                            letterSpacing: 1,
+                          }}
+                        >
+                          {intg.name}
+                        </div>
+                        <div style={{ fontSize: 7, color: "#666", marginTop: 1 }}>
+                          {intg.desc}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Entities */}
+              <div style={{ marginTop: 20 }}>
+                <div
+                  style={{
+                    textAlign: "center",
+                    fontFamily: "monospace",
+                    fontSize: 8,
+                    letterSpacing: 4,
+                    color: "#D4AF3766",
+                    marginBottom: 10,
+                  }}
+                >
+                  THREE ENTITIES · ONE ECOSYSTEM
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+                  {entities.map((ent, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        background: `linear-gradient(135deg, rgba(0,0,0,0.6), ${ent.color}11)`,
+                        border: `1.5px solid ${ent.color}44`,
+                        borderRadius: 14,
+                        padding: "14px 10px",
+                        textAlign: "center",
+                      }}
+                    >
+                      <div style={{ fontSize: 20, marginBottom: 4 }}>{ent.icon}</div>
+                      <div
+                        style={{
+                          fontFamily: "monospace",
+                          fontWeight: 800,
+                          fontSize: 10,
+                          color: ent.color,
+                          letterSpacing: 2,
+                        }}
+                      >
+                        {ent.abbr}
+                      </div>
+                      <div style={{ fontSize: 7, color: "#ccc", marginTop: 3, lineHeight: 1.4 }}>
+                        {ent.name}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 7,
+                          color: ent.color + "aa",
+                          marginTop: 4,
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        {ent.type}
+                      </div>
+                      <div
+                        style={{
+                          marginTop: 6,
+                          background: `${ent.color}22`,
+                          borderRadius: 6,
+                          padding: "3px 6px",
+                          fontSize: 8,
+                          color: ent.color,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {ent.value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Revenue */}
+              <div style={{ marginTop: 20 }}>
+                <div
+                  style={{
+                    textAlign: "center",
+                    fontFamily: "monospace",
+                    fontSize: 8,
+                    letterSpacing: 4,
+                    color: "#D4AF3766",
+                    marginBottom: 10,
+                  }}
+                >
+                  REVENUE VEHICLES
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
+                  {[
+                    { label: "Magazine Publishing", detail: "10 Brands · $997–$2,500", icon: " ", color: "#4FC3F7" },
+                    { label: "Legal Notice Empire", detail: "43 States · 263+ Mastheads", icon: " ", color: "#D4AF37" },
+                    { label: "MOTY 2026 Campaign", detail: "Vote4Mom.com · May 31 Crown", icon: " ", color: "#F48FB1" },
+                    { label: "EV Charging (Dunamis)", detail: "DTE Partnership · ~$70K/install", icon: " ", color: "#69F0AE" },
+                  ].map((rv, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        background: "rgba(255,255,255,0.02)",
+                        border: `1px solid ${rv.color}33`,
+                        borderRadius: 10,
+                        padding: "10px 12px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                      }}
+                    >
+                      <span style={{ fontSize: 18 }}>{rv.icon}</span>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 10, color: rv.color }}>
+                          {rv.label}
+                        </div>
+                        <div style={{ fontSize: 7, color: "#666", marginTop: 2 }}>
+                          {rv.detail}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* KPI Bar */}
+              <div
+                style={{
+                  marginTop: 18,
+                  background: "linear-gradient(135deg, #1a1000, #0d1a00)",
+                  border: "1.5px solid #D4AF3733",
+                  borderRadius: 14,
+                  padding: "14px 18px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: 10,
+                }}
+              >
+                {[
+                  { label: "DAILY TARGET", value: "$11,295", unit: "/ day", color: "#D4AF37" },
+                  { label: "AI STACK COST", value: "~$89–$119", unit: "/ mo", color: "#69F0AE" },
+                  { label: "BDT VALUATION", value: "$8.0B", unit: "FMV", color: "#4FC3F7" },
+                  { label: "OPENCLAW", value: "FREE", unit: "open-source", color: "#FF7043" },
+                ].map((k, i) => (
+                  <div key={i}>
+                    <div
+                      style={{
+                        fontFamily: "monospace",
+                        fontSize: 8,
+                        color: k.color,
+                        letterSpacing: 2,
+                        marginBottom: 2,
+                      }}
+                    >
+                      {k.label}
+                    </div>
+                    <div style={{ fontWeight: 900, fontSize: 20, color: "#fff" }}>
+                      {k.value}{" "}
+                      <span style={{ fontSize: 10, color: k.color + "99" }}>{k.unit}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(<AIWorkflow />);
+    </script>
+  </body>
+</html>

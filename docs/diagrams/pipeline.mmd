@@ -1,0 +1,51 @@
+flowchart LR
+  %% 95588 -> Firefly pipeline (incremental & full)
+
+  subgraph Inputs[Inputs]
+    chatdb[(macOS Messages chat.db)]
+    rules[(rules/icbc_95588_rules.json)]
+    env[(.env)]
+    state[(exports/95588_state.json)]
+  end
+
+  subgraph Ingest[Ingest / Export]
+    export_imsg[export_imessage_sender.py\nchat.db -> raw JSONL]
+    validate_export[validate_imessage_export.py\nsanity checks]
+  end
+
+  subgraph ParseClassify[Parse / Classify]
+    pipeline[pipeline_95588_classify_with_ai.py\nrules + AI -> firefly JSONL]
+    ai_audit[(ai_audit/*.jsonl)]
+  end
+
+  subgraph Firefly[Firefly]
+    firefly_jsonl[(firefly_delta.jsonl / firefly_all.jsonl)]
+    push[push_firefly_jsonl.py\nPOST /api/v1/transactions]
+    push_state[(push_state.jsonl)]
+    firefly_api[(Firefly III API)]
+  end
+
+  subgraph Archive[Run Archive]
+    run_dir[(exports/runs/<timestamp>/)]
+  end
+
+  %% Flow: incremental
+  state --> export_imsg
+  chatdb --> export_imsg
+  export_imsg --> validate_export
+  rules --> pipeline
+  env --> pipeline
+  validate_export --> pipeline
+  pipeline --> ai_audit
+  pipeline --> firefly_jsonl
+  env --> push
+  firefly_jsonl --> push
+  push --> firefly_api
+  push --> push_state
+
+  %% Archive artifacts
+  export_imsg --> run_dir
+  validate_export --> run_dir
+  pipeline --> run_dir
+  push_state --> run_dir
+
