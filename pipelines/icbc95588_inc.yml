@@ -1,0 +1,41 @@
+name: icbc95588_inc
+artifacts_dir: exports/runs
+
+state:
+  type: rowid_watermark
+  path: exports/95588_state.json
+
+source:
+  type: imessage_sqlite
+  sender: "95588"
+  db_path: "~/Library/Messages/chat.db"
+
+parser:
+  type: icbc95588_sms
+
+classifier:
+  type: rules_ai
+  rules_path: rules/icbc_95588_rules.json
+  ai:
+    enabled: true
+    provider: openai_compatible
+    api: openai-responses
+    base_url_env: DEEPSEEK_BASE_URL
+    api_key_env: DEEPSEEK_API_KEY
+    model_env: DEEPSEEK_MODEL
+    fail_hard: true
+
+exporter:
+  type: firefly_jsonl
+  tz: "+08:00"
+  asset_prefix: "工商银行"
+
+sink:
+  type: firefly_api
+  base_url_env: FIREFLY_BASE_URL
+  token_env: FIREFLY_TOKEN
+  bootstrap_assets: true
+  idempotency:
+    state_path: push_state.jsonl
+    server_duplicate_hash: true
+

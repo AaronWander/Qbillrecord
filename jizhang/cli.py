@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 from jizhang import __version__
+from jizhang.env import load_dotenv
+from jizhang.pipeline.config import load_pipeline
+from jizhang.pipeline.errors import ConfigError
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -33,9 +37,15 @@ def _cmd_list(_args: argparse.Namespace) -> int:
 
 
 def _cmd_doctor(args: argparse.Namespace) -> int:
-    print(f"doctor: pipeline={args.pipeline}")
-    print("Not implemented yet (Task 3).")
-    return 2
+    try:
+        cfg = load_pipeline(args.pipeline)
+    except ConfigError as e:
+        print(f"doctor: invalid pipeline config: {e}", file=sys.stderr)
+        return 2
+
+    print(f"doctor: ok pipeline={cfg.path}")
+    print(f"doctor: name={cfg.name}")
+    return 0
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
@@ -45,6 +55,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Load repo-root .env if present (users can still override via real env vars).
+    load_dotenv(Path(".env"), override=False)
+
     parser = _build_parser()
     args = parser.parse_args(argv)
     func = getattr(args, "func", None)
@@ -52,4 +65,3 @@ def main(argv: list[str] | None = None) -> int:
         parser.print_help(sys.stderr)
         return 2
     return int(func(args) or 0)
-
