@@ -1,2 +1,28 @@
 .env
+# macOS / editor
+.DS_Store
+.idea/
+.vscode/
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Local artifacts (may contain personal financial data)
+exports/
+reports/
+backup.zip
+
+# Logs / temp
+*.log
+tmp/
