@@ -221,23 +221,24 @@ def run_pipeline(cfg: PipelineConfig) -> RunResult:
         return RunResult(rc=pipe_rc, run_dir=run_dir)
 
     # 4) Sink: push to Firefly
-    from scripts.push_firefly_jsonl import main as push_main  # type: ignore
+    from jizhang.sink.firefly import push_firefly_jsonl
 
     push_state = run_dir / "push_state.jsonl"
-    push_argv = [
-        "push_firefly_jsonl.py",
-        "--in",
-        str(firefly_out),
-        "--state",
-        str(push_state),
-        "--skip-using-state",
-    ]
-    if bool(sink.get("bootstrap_assets", False)):
-        push_argv.append("--bootstrap-assets")
-
-    sys.argv = push_argv
-    push_main()
-    manifest["sink"] = {"type": sink_type, "push_state": str(push_state)}
+    summary = push_firefly_jsonl(
+        in_path=firefly_out,
+        state_path=push_state,
+        base_url=str(sink.get("base_url") or ""),
+        token=str(sink.get("token") or ""),
+        timeout_s=int(sink.get("timeout_s") or 30),
+        retries=int(sink.get("retries") or 3),
+        retry_sleep_s=float(sink.get("retry_sleep_s") or 1.5),
+        bootstrap_assets=bool(sink.get("bootstrap_assets", False)),
+        skip_using_state=True,
+        no_error_if_duplicate=bool(sink.get("no_error_if_duplicate", False)),
+        dry_run=bool(sink.get("dry_run", False)),
+        limit=int(sink.get("limit") or 0),
+    )
+    manifest["sink"] = {"type": sink_type, "push_state": str(push_state), "summary": summary.__dict__}
 
     # 5) Update watermark state
     _save_rowid_state(state_path, new_max)
