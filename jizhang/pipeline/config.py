@@ -14,6 +14,29 @@ def _is_env_ref_key(key: str) -> bool:
     return isinstance(key, str) and (key.endswith("_env") or key.endswith("_ENV"))
 
 
+def collect_env_refs(obj: Any) -> list[tuple[str, str]]:
+    """
+    Return a list of (key, env_var_name) referenced via *_env/*_ENV keys.
+    Intended for `doctor` to show missing env vars without aborting early.
+    """
+    out: list[tuple[str, str]] = []
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if _is_env_ref_key(k):
+                if isinstance(v, str) and v.strip():
+                    out.append((str(k), v.strip()))
+                else:
+                    out.append((str(k), ""))
+                continue
+            out.extend(collect_env_refs(v))
+        return out
+    if isinstance(obj, list):
+        for x in obj:
+            out.extend(collect_env_refs(x))
+        return out
+    return out
+
+
 def _resolve_env_refs(obj: Any, *, env: dict[str, str]) -> Any:
     """
     Resolve keys ending with _env/_ENV:
@@ -83,3 +106,21 @@ def load_pipeline(path: str | Path, *, env: dict[str, str] | None = None) -> Pip
 
     return PipelineConfig(raw=resolved, path=p)
 
+
+def load_pipeline_raw(path: str | Path) -> dict[str, Any]:
+    """
+    Load pipeline YAML without resolving env references.
+    Used by `doctor` for more detailed diagnostics.
+    """
+    p = Path(path)
+    if not p.exists():
+        raise ConfigError(f"Pipeline file not found: {p}")
+    if not p.is_file():
+        raise ConfigError(f"Pipeline path is not a file: {p}")
+    try:
+        data = yaml.safe_load(p.read_text(encoding="utf-8"))
+    except Exception as e:
+        raise ConfigError(f"Failed to parse YAML: {p}: {e}") from e
+    if not isinstance(data, dict):
+        raise ConfigError("Pipeline YAML must be a mapping/object at top-level")
+    return data

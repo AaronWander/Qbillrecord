@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
 from jizhang import __version__
 from jizhang.env import load_dotenv
-from jizhang.pipeline.config import load_pipeline
+from jizhang.pipeline.config import collect_env_refs, load_pipeline, load_pipeline_raw
 from jizhang.pipeline.errors import ConfigError
 from jizhang.steps import builtins as _builtins  # noqa: F401
 from jizhang.registry import REGISTRY
@@ -43,6 +44,62 @@ def _cmd_list(_args: argparse.Namespace) -> int:
 
 
 def _cmd_doctor(args: argparse.Namespace) -> int:
+    # Phase 1: load raw YAML and report missing env vars and obvious path issues
+    try:
+        raw = load_pipeline_raw(args.pipeline)
+    except ConfigError as e:
+        print(f"doctor: invalid pipeline config: {e}", file=sys.stderr)
+        return 2
+
+    issues: list[str] = []
+
+    # Collect missing env vars
+    refs = collect_env_refs(raw)
+    missing_env: list[str] = []
+    invalid_env_ref: list[str] = []
+    for key, env_name in refs:
+        if not env_name:
+            invalid_env_ref.append(key)
+            continue
+        if (os.environ.get(env_name) or "").strip() == "":
+            missing_env.append(env_name)
+    missing_env = sorted(set(missing_env))
+    invalid_env_ref = sorted(set(invalid_env_ref))
+    if invalid_env_ref:
+        issues.append(f"invalid *_env values for keys: {', '.join(invalid_env_ref)}")
+    if missing_env:
+        issues.append(f"missing env vars: {', '.join(missing_env)}")
+
+    # Path checks (best-effort; some steps may not need these)
+    try:
+        src = raw.get("source") or {}
+        if isinstance(src, dict):
+            db_path = src.get("db_path")
+            if isinstance(db_path, str) and db_path.strip():
+                p = Path(os.path.expanduser(db_path.strip()))
+                if not p.exists():
+                    issues.append(f"source.db_path not found: {p}")
+    except Exception:
+        pass
+
+    try:
+        cls = raw.get("classifier") or {}
+        if isinstance(cls, dict):
+            rules_path = cls.get("rules_path")
+            if isinstance(rules_path, str) and rules_path.strip():
+                p = Path(rules_path.strip())
+                if not p.exists():
+                    issues.append(f"classifier.rules_path not found: {p}")
+    except Exception:
+        pass
+
+    if issues:
+        print(f"doctor: issues found for pipeline={args.pipeline}", file=sys.stderr)
+        for it in issues:
+            print(f"- {it}", file=sys.stderr)
+        return 2
+
+    # Phase 2: fully resolve env refs and validate required keys
     try:
         cfg = load_pipeline(args.pipeline)
     except ConfigError as e:
