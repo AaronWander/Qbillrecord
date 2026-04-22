@@ -143,26 +143,22 @@ def run_pipeline(cfg: PipelineConfig) -> RunResult:
     print(f"[run] last_rowid={last_rowid}", file=sys.stderr, flush=True)
 
     # 2) Source: export delta to run_dir/raw.jsonl
-    from scripts.export_imessage_sender import main as export_main  # type: ignore
-    from scripts.validate_imessage_export import validate as validate_export  # type: ignore
+    from jizhang.ingest.imessage import iter_sender_messages, write_jsonl
+    from jizhang.ingest.validate import validate as validate_export
 
     sender = str(source.get("sender") or "95588")
     db_path = os.path.expanduser(str(source.get("db_path") or ""))
     raw_out = run_dir / "raw.jsonl"
 
-    argv = [
-        "export_imessage_sender.py",
-        "--db",
-        db_path,
-        "--sender",
-        sender,
-        "--out",
-        str(raw_out),
-        "--since-rowid",
-        str(last_rowid),
-    ]
-    sys.argv = argv
-    export_main()
+    count = write_jsonl(
+        iter_sender_messages(
+            db_path=db_path,
+            sender_like=f"%{sender}%",
+            since_rowid=int(last_rowid),
+        ),
+        raw_out,
+    )
+    print(f"[run] exported messages={count} to {raw_out}", file=sys.stderr, flush=True)
 
     new_max = _max_rowid_in_jsonl(raw_out)
     manifest["source"] = {"sender": sender, "db_path": db_path, "raw_out": str(raw_out), "rowid_max": new_max}
