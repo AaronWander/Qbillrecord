@@ -176,8 +176,8 @@ def run_pipeline(cfg: PipelineConfig) -> RunResult:
         print(f"[run] export anomalies found; saved {len(alerts)} alerts to {alerts_path}.", file=sys.stderr, flush=True)
         return RunResult(rc=2, run_dir=run_dir)
 
-    # 3) Parse + classify + export (existing pipeline script)
-    from scripts.pipeline_95588_classify_with_ai import main as pipe_main  # type: ignore
+    # 3) Parse + classify + export
+    from jizhang.transform.icbc95588_pipeline import run_pipeline as transform_run
 
     rules_path = str(classifier.get("rules_path") or "")
     ai_cfg = classifier.get("ai") or {}
@@ -186,28 +186,19 @@ def run_pipeline(cfg: PipelineConfig) -> RunResult:
     firefly_out = run_dir / "firefly.jsonl"
     _ensure_dir(audit_dir)
 
-    pipe_argv = [
-        "pipeline_95588_classify_with_ai.py",
-        "--in",
-        str(raw_out),
-        "--rules",
-        rules_path,
-        "--firefly-out",
-        str(firefly_out),
-        "--audit-dir",
-        str(audit_dir),
-        "--tz",
-        str(exporter.get("tz") or "+08:00"),
-        "--asset-prefix",
-        str(exporter.get("asset_prefix") or "工商银行"),
-    ]
-    if not ai_enabled:
-        pipe_argv.append("--no-ai")
-    if bool(exporter.get("apply_rules", False)):
-        pipe_argv.append("--apply-rules")
-
-    sys.argv = pipe_argv
-    pipe_rc = int(pipe_main() or 0)
+    pipe_rc = int(
+        transform_run(
+            in_path=str(raw_out),
+            rules_path=rules_path,
+            firefly_out=str(firefly_out),
+            audit_dir=str(audit_dir),
+            tz=str(exporter.get("tz") or "+08:00"),
+            asset_prefix=str(exporter.get("asset_prefix") or "工商银行"),
+            no_ai=(not ai_enabled),
+            apply_rules=bool(exporter.get("apply_rules", False)),
+        )
+        or 0
+    )
     manifest["transform"] = {
         "rules_path": rules_path,
         "ai_enabled": ai_enabled,
