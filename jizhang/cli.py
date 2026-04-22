@@ -10,6 +10,7 @@ from jizhang.pipeline.config import load_pipeline
 from jizhang.pipeline.errors import ConfigError
 from jizhang.steps import builtins as _builtins  # noqa: F401
 from jizhang.registry import REGISTRY
+from jizhang.pipeline.runner import safe_run_pipeline
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -54,9 +55,23 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
-    print(f"run: pipeline={args.pipeline}")
-    print("Not implemented yet (Task 7).")
-    return 2
+    try:
+        cfg = load_pipeline(args.pipeline)
+    except ConfigError as e:
+        print(f"run: invalid pipeline config: {e}", file=sys.stderr)
+        return 2
+
+    try:
+        res = safe_run_pipeline(cfg)
+    except ConfigError as e:
+        print(f"run: invalid pipeline config: {e}", file=sys.stderr)
+        return 2
+    except Exception as e:
+        print(f"run: failed: {e}", file=sys.stderr)
+        return 2
+
+    print(f"run: ok rc={res.rc} run_dir={res.run_dir}")
+    return int(res.rc)
 
 
 def main(argv: list[str] | None = None) -> int:
