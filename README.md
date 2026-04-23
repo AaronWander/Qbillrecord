@@ -50,6 +50,39 @@ Optional for AI classification (when enabled by pipeline):
 - `DEEPSEEK_API_KEY`
 - `DEEPSEEK_MODEL`
 
+## Customization
+
+This repo is currently opinionated: **macOS iMessage + ICBC 95588 Chinese SMS** → Firefly III.
+
+There are two different kinds of customization:
+
+### A) Change the sender (easy: config-only)
+
+If you are still reading from macOS Messages (`chat.db`) but want to export messages from a different sender/number:
+
+- Edit `pipelines/qbillrecord_icbc95588_inc.yml`
+- Update:
+  - `source.sender`: set it to the sender you want (e.g. `"95588"` → `"YourSender"`)
+
+This will affect what gets exported into `exports/runs/<ts>/raw.jsonl`.
+
+Important: changing `source.sender` **does not automatically change the parser/rules**. If the message template differs from ICBC 95588, the transform step may fail to parse most messages.
+
+### B) Change the message template/language (requires code + rules)
+
+If the SMS content is not in the ICBC 95588 Chinese template (e.g. another bank, another country, English notifications), you will need to add:
+
+1) A new rules file under `rules/` (patterns, ignore keywords, category mapping).
+2) A new transform implementation (or a generalized parser) and register it as a new `transform` type.
+3) A new pipeline YAML that points to your new transform + rules.
+
+The existing built-in transform is:
+
+- `transform: icbc95588_rules_ai` (configured via the `classifier` section of the pipeline)
+- rules file: `rules/icbc_95588_rules.json`
+
+If you want to upstream support for another bank/template, the recommended approach is to keep bank/template-specific rules in separate files (one per template) and wire them via the pipeline.
+
 ## Artifacts (audit / replay)
 
 Each run writes a timestamped folder under `exports/runs/<timestamp>/`:
