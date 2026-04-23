@@ -79,4 +79,4 @@ These artifacts may include sensitive personal financial data and are ignored by
 ## Project status
 
 The repo is a `python -m qbillrecord` CLI driven by YAML pipelines. Background/design:
-- `docs/plans/2026-04-22-cli-pipeline-rebuild-design.md`
+- `docs/ARCHITECTURE.md`
