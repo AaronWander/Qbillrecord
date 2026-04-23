@@ -1,4 +1,4 @@
-# jizhang
+# Qbillrecord
 
 Personal finance pipeline: ingest bank SMS → parse → classify (rules + optional AI) → export/push to Firefly III.
 
@@ -7,9 +7,9 @@ Personal finance pipeline: ingest bank SMS → parse → classify (rules + optio
 This project is a CLI app (no packaging in v1). Run via:
 
 ```bash
-python -m jizhang list
-python -m jizhang doctor --pipeline pipelines/icbc95588_inc.yml
-python -m jizhang run --pipeline pipelines/icbc95588_inc.yml
+python -m qbillrecord list
+python -m qbillrecord doctor --pipeline pipelines/qbillrecord_icbc95588_inc.yml
+python -m qbillrecord run --pipeline pipelines/qbillrecord_icbc95588_inc.yml
 ```
 
 ## Pipelines
@@ -24,7 +24,7 @@ Environment variables may be referenced only via `*_env/*_ENV` keys (no `${VAR}`
 
 Pipelines live in `pipelines/*.yml`. They select step implementations by `type` and may reference environment variables via `*_env` keys.
 
-Example: `pipelines/icbc95588_inc.yml`.
+Example: `pipelines/qbillrecord_icbc95588_inc.yml`.
 
 ### 2) Environment variables (secrets / environment-specific)
 
@@ -48,5 +48,5 @@ These artifacts may include sensitive personal financial data and are ignored by
 
 ## Project status
 
-The repo is currently being rebuilt from a set of scripts into a mature `python -m jizhang` CLI driven by YAML pipelines. See:
+The repo is a `python -m qbillrecord` CLI driven by YAML pipelines. See:
 - `docs/plans/2026-04-22-cli-pipeline-rebuild-design.md`

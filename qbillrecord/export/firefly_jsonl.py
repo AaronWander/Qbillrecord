@@ -6,7 +6,7 @@ User requirements:
 - Category uses unified categories (no "收入/支出" split). Direction is derived from transaction type.
 
 Input:
-  exports/95588_all.jsonl (from `python -m jizhang run ...` or legacy export script)
+  exports/95588_all.jsonl (from `python -m qbillrecord run ...`)
 Rules:
   rules/icbc_95588_rules.json
 
@@ -29,7 +29,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from jizhang.parse import icbc95588 as classifier
+from qbillrecord.parse import icbc95588 as classifier
 
 
 def ensure_parent(path: str) -> None:

@@ -5,9 +5,9 @@ import os
 from pathlib import Path
 from typing import Any
 
-from jizhang.ingest.imessage import iter_sender_messages, write_jsonl
-from jizhang.ingest.validate import validate
-from jizhang.steps.base import RunContext, Source
+from qbillrecord.ingest.imessage import iter_sender_messages, write_jsonl
+from qbillrecord.ingest.validate import validate
+from qbillrecord.steps.base import RunContext, Source
 
 
 class IMessageSqliteSource(Source):
@@ -53,4 +53,3 @@ class IMessageSqliteSource(Source):
             return {"count": count, "rowid_max": rowid_max, "alerts": len(alerts), "alerts_path": str(alerts_path)}
 
         return {"count": count, "rowid_max": rowid_max, "alerts": 0}
-

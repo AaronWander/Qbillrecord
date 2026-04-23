@@ -10,11 +10,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from jizhang.pipeline.config import PipelineConfig
-from jizhang.pipeline.errors import ConfigError, JizhangError
-from jizhang.registry import REGISTRY
-from jizhang.steps.base import RunContext, Sink, StateStore, Source, Transform
-from jizhang.steps import builtins as _builtins  # noqa: F401
+from qbillrecord.pipeline.config import PipelineConfig
+from qbillrecord.pipeline.errors import ConfigError, JizhangError
+from qbillrecord.registry import REGISTRY
+from qbillrecord.steps.base import RunContext, Sink, StateStore, Source, Transform
+from qbillrecord.steps import builtins as _builtins  # noqa: F401
 
 
 def _ts() -> str:
@@ -165,7 +165,7 @@ def run_pipeline(cfg: PipelineConfig) -> RunResult:
         return RunResult(rc=0, run_dir=run_dir)
 
     # 3) Parse + classify + export
-    from jizhang.transform.icbc95588_pipeline import run_pipeline as transform_run
+    from qbillrecord.transform.icbc95588_pipeline import run_pipeline as transform_run
 
     _ensure_dir(audit_dir)
     pipe_rc = int(transform_step.run(ctx=ctx) or 0)

@@ -5,18 +5,18 @@ import os
 import sys
 from pathlib import Path
 
-from jizhang import __version__
-from jizhang.env import load_dotenv
-from jizhang.pipeline.config import collect_env_refs, load_pipeline, load_pipeline_raw
-from jizhang.pipeline.errors import ConfigError
-from jizhang.steps import builtins as _builtins  # noqa: F401
-from jizhang.registry import REGISTRY
-from jizhang.pipeline.runner import safe_run_pipeline
+from qbillrecord import __version__
+from qbillrecord.env import load_dotenv
+from qbillrecord.pipeline.config import collect_env_refs, load_pipeline, load_pipeline_raw
+from qbillrecord.pipeline.errors import ConfigError
+from qbillrecord.steps import builtins as _builtins  # noqa: F401
+from qbillrecord.registry import REGISTRY
+from qbillrecord.pipeline.runner import safe_run_pipeline
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="python -m jizhang", description="jizhang CLI (pipeline-driven)")
-    p.add_argument("--version", action="version", version=f"jizhang {__version__}")
+    p = argparse.ArgumentParser(prog="python -m qbillrecord", description="Qbillrecord CLI (pipeline-driven)")
+    p.add_argument("--version", action="version", version=f"Qbillrecord {__version__}")
 
     sub = p.add_subparsers(dest="cmd", required=True)
 

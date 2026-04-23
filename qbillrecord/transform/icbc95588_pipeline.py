@@ -35,7 +35,7 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-from jizhang.llm.ai_classify import (
+from qbillrecord.llm.ai_classify import (
     deepseek_chat_completion,
     extract_assistant_text,
     load_dotenv,
@@ -44,7 +44,7 @@ from jizhang.llm.ai_classify import (
     sha256_id,
     try_parse_json,
 )
-from jizhang.parse.icbc95588 import (
+from qbillrecord.parse.icbc95588 import (
     RawMsg,
     classify,
     compile_patterns,
@@ -56,7 +56,7 @@ from jizhang.parse.icbc95588 import (
     should_force_parse,
     should_ignore,
 )
-from jizhang.export import firefly_jsonl as firefly_export
+from qbillrecord.export import firefly_jsonl as firefly_export
 
 
 @dataclass(frozen=True)

@@ -1,6 +1,6 @@
-# jizhang：95588 → Firefly 流水线架构梳理
+# Qbillrecord：95588 → Firefly 流水线架构梳理
 
-本仓库当前形态是一个 **`python -m jizhang`** 驱动的 CLI 项目，采用“pipeline（可替换步骤）”的方式组织：source → transform → sink。
+本仓库当前形态是一个 **`python -m qbillrecord`** 驱动的 CLI 项目，采用“pipeline（可替换步骤）”的方式组织：source → transform → sink。
 它具备清晰的端到端链路，并通过 YAML pipeline 配置实现输入源/解析规则/分类规则/输出端的可替换与扩展。
 
 ## 1. 一句话定位（Why / What）
@@ -27,14 +27,14 @@
 ### 3.1 分层视图
 
 - **控制面 / 编排层**
-  - `jizhang/cli.py`：统一 CLI（`python -m jizhang ...`）
-  - `jizhang/pipeline/runner.py`：pipeline 编排与 run artifacts
+  - `qbillrecord/cli.py`：统一 CLI（`python -m qbillrecord ...`）
+  - `qbillrecord/pipeline/runner.py`：pipeline 编排与 run artifacts
 
 - **执行面 / 处理层（可替换 steps）**
-  - state：`jizhang/steps/state_rowid.py`
-  - source：`jizhang/steps/source_imessage.py`
-  - transform：`jizhang/steps/transform_icbc95588.py`（内部调用 `jizhang/transform/icbc95588_pipeline.py`）
-  - sink：`jizhang/steps/sink_firefly.py`
+  - state：`qbillrecord/steps/state_rowid.py`
+  - source：`qbillrecord/steps/source_imessage.py`
+  - transform：`qbillrecord/steps/transform_icbc95588.py`（内部调用 `qbillrecord/transform/icbc95588_pipeline.py`）
+  - sink：`qbillrecord/steps/sink_firefly.py`
 
 - **扩展面 / 配置&规则**
   - Pipeline 配置：`pipelines/*.yml`
@@ -42,19 +42,15 @@
   - 环境变量：`.env` / `.env.example`
   - 产物目录：`exports/`（默认不进 git）
 
-### 3.2 组件职责表（“脚本即组件”）
+### 3.2 组件职责表（模块/步骤）
 
-| 组件/脚本 | 职责 | 主要输入 | 主要输出 |
+| 模块/步骤 | 职责 | 主要输入 | 主要输出 |
 |---|---|---|---|
-| `scripts/export_imessage_sender.py` | 从 Messages `chat.db` 导出 sender 短信到 JSONL；统一 `content` | `chat.db` | `exports/...jsonl`（raw） |
-| `scripts/validate_imessage_export.py` | 导出 JSONL 的保守校验（空 content/纯附件等） | raw JSONL | alerts 列表/JSONL |
-| `scripts/classify_95588_jsonl_to_md.py` | 规则解析短信为交易；规则分类；渲染 Markdown 分类报告 | raw JSONL + rules | `reports/...md` |
-| `scripts/ai_classify_from_classified.py` | 从分类 md 里抽“待分类”批量问 DeepSeek；写 request/response JSONL | classified md + rules | deepseek 请求/响应 JSONL |
-| `scripts/pipeline_95588_classify_with_ai.py` | 端到端“分类+AI 应用+导出 Firefly JSONL”；可写审计文件 | raw JSONL + rules | `firefly_*.jsonl` + `ai_audit/` |
-| `scripts/export_firefly_transactions_from_jsonl.py` | 将解析交易映射为 Firefly TransactionStore payload JSONL | raw JSONL + rules | Firefly payload JSONL |
-| `scripts/push_firefly_jsonl.py` | Firefly API 推送；可 bootstrap 资产账户；去重/状态记录 | firefly JSONL | `push_state.jsonl` |
-| `scripts/run_incremental_95588_to_firefly.py` | 增量编排：水位 → 导出 delta → pipeline → push → 更新水位 | state + chat.db + rules | `exports/runs/<ts>/...` + state |
-| `scripts/jizhang.py` | 交互式聚合入口（增量/全量/重放） | 用户选择 | 调用上述组件 |
+| `qbillrecord/steps/source_imessage.py` | 从 Messages `chat.db` 导出 sender 短信到 JSONL；统一 `content` | `chat.db` | `exports/runs/<ts>/raw.jsonl` |
+| `qbillrecord/steps/transform_icbc95588.py` | 解析+规则分类+AI 补全+导出 Firefly JSONL | raw JSONL + rules | `exports/runs/<ts>/firefly.jsonl` + `ai_audit/` |
+| `qbillrecord/steps/sink_firefly.py` | Firefly API 推送；可 bootstrap 资产账户；去重/状态记录 | firefly JSONL | `exports/runs/<ts>/push_state.jsonl` |
+| `qbillrecord/steps/state_rowid.py` | 增量水位（ROWID）读写 | state json | state json |
+| `qbillrecord/pipeline/runner.py` | 编排：state → source → transform → sink → 更新 state | pipeline + env | run dir + state |
 
 ## 4. 核心数据对象（对象模型）
 
@@ -76,13 +72,13 @@
 
 ### 5.1 增量链路（推荐日常使用）
 
-入口：`scripts/run_incremental_95588_to_firefly.py`
+入口：`python -m qbillrecord run --pipeline pipelines/qbillrecord_icbc95588_inc.yml`
 
 1) 读取水位：`exports/95588_state.json:last_rowid`
 2) 导出 delta：`export_imessage_sender.py --since-rowid <last_rowid>` → `exports/runs/<ts>/raw_delta.jsonl`
 3) 校验导出：`validate_imessage_export.py`（发现异常则中止，产出 alerts）
-4) 分类+AI+导出：`pipeline_95588_classify_with_ai.py` → `exports/runs/<ts>/firefly_delta.jsonl` + `exports/runs/<ts>/ai_audit/*`
-5) 推送：`push_firefly_jsonl.py` → `exports/runs/<ts>/push_state.jsonl`
+4) 分类+AI+导出：transform step → `exports/runs/<ts>/firefly.jsonl` + `exports/runs/<ts>/ai_audit/*`
+5) 推送：sink step → `exports/runs/<ts>/push_state.jsonl`
 6) 更新水位：写回 `exports/95588_state.json:last_rowid=<new_max>`
 
 **幂等/去重语义**
@@ -92,7 +88,7 @@
 
 ### 5.2 全量链路（用于首次导入/重建）
 
-入口：`scripts/jizhang.py` 的“全量”选项（内部调用 export + pipeline + push）。
+入口：`python -m qbillrecord run --pipeline ...`（通过 pipeline 决定全量/增量策略，后续可扩展）。
 
 差异点：
 - 全量不会更新 `exports/95588_state.json`（避免误移动增量水位）
@@ -136,11 +132,11 @@ repo 根目录 `.env`（示例见 `.env.example`）：
 
 ### Stage A：文档化 + 统一入口（低风险）
 - 新增 `docs/ARCHITECTURE.md` 与流程图（已完成）
-- 给一个稳定命令入口（例如 `python3 -m jizhang ...` 或 `jizhang` CLI），脚本仍可复用
+- 给一个稳定命令入口（例如 `python3 -m qbillrecord ...`），并将步骤做成可替换的 pipeline
 - 把所有 I/O 路径与环境变量集中成一个 config 模块（避免每个脚本各读一遍）
 
 ### Stage B：模块化（把脚本“收敛为包”）
-- 引入 `src/jizhang/`（或 `jizhang/`）包结构：
+- 引入 `src/qbillrecord/`（或 `qbillrecord/`）包结构：
   - `ingest/`（导出 raw）
   - `parse/`（解析交易）
   - `classify/`（规则分类 + AI 分类）

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from jizhang.sink.firefly import push_firefly_jsonl
-from jizhang.steps.base import RunContext, Sink
+from qbillrecord.sink.firefly import push_firefly_jsonl
+from qbillrecord.steps.base import RunContext, Sink
 
 
 class FireflyApiSink(Sink):
@@ -25,4 +25,3 @@ class FireflyApiSink(Sink):
             limit=int(self.cfg.get("limit") or 0),
         )
         return summary.__dict__
-

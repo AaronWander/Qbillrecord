@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from jizhang.pipeline.errors import ConfigError
-from jizhang.steps.base import StateStore
+from qbillrecord.pipeline.errors import ConfigError
+from qbillrecord.steps.base import StateStore
 
 
 class RowidWatermarkState(StateStore):
@@ -39,4 +39,3 @@ class RowidWatermarkState(StateStore):
                 last_rowid = 0
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps({"last_rowid": last_rowid}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from jizhang.steps.base import RunContext, Transform
-from jizhang.transform.icbc95588_pipeline import run_pipeline
+from qbillrecord.steps.base import RunContext, Transform
+from qbillrecord.transform.icbc95588_pipeline import run_pipeline
 
 
 class Icbc95588RulesAiTransform(Transform):
@@ -36,4 +36,3 @@ class Icbc95588RulesAiTransform(Transform):
             )
             or 0
         )
-

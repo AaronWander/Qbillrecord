@@ -7,7 +7,7 @@ from typing import Any
 
 import yaml
 
-from jizhang.pipeline.errors import ConfigError
+from qbillrecord.pipeline.errors import ConfigError
 
 
 def _is_env_ref_key(key: str) -> bool:

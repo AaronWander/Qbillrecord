@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from jizhang.registry import REGISTRY
-from jizhang.steps.state_rowid import RowidWatermarkState
-from jizhang.steps.source_imessage import IMessageSqliteSource
-from jizhang.steps.transform_icbc95588 import Icbc95588RulesAiTransform
-from jizhang.steps.sink_firefly import FireflyApiSink
+from qbillrecord.registry import REGISTRY
+from qbillrecord.steps.state_rowid import RowidWatermarkState
+from qbillrecord.steps.source_imessage import IMessageSqliteSource
+from qbillrecord.steps.transform_icbc95588 import Icbc95588RulesAiTransform
+from qbillrecord.steps.sink_firefly import FireflyApiSink
 
 
 def _register() -> None:
