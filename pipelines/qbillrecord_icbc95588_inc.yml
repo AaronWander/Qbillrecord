@@ -12,7 +12,7 @@ source:
 
 classifier:
   type: icbc95588_rules_ai
-  rules_path: rules/icbc_95588_rules.json
+  rules_path: rules/icbc_95588_rules.example.json
   ai:
     enabled: true
     provider: openai_compatible

@@ -1,0 +1,100 @@
+{
+  // Example rules file (English + comments).
+  //
+  // Purpose:
+  // - Provide a template for building your own SMS parsing + categorization rules.
+  // - This repository intentionally does NOT ship with the author's personal rules/data.
+  //
+  // Notes:
+  // - The pipeline loader expects JSON. This JSONC file is for humans.
+  // - For actual execution, copy this file to `rules/icbc_95588_rules.json` and remove comments,
+  //   or copy `rules/icbc_95588_rules.example.json` (valid JSON) and edit it.
+
+  // Messages containing any of these substrings are ignored, unless they also match a force-parse regex.
+  "ignore_if_text_matches_any": ["OTP", "verification code", "security alert", "login", "password"],
+
+  // Force-parse even if ignore keywords matched (to reduce false positives).
+  // Example: only parse messages that look like a balance-change notification.
+  "force_parse_if_text_matches_any_regex": [
+    "balance\\s*[:：]\\s*[0-9,]+(?:\\.[0-9]+)?",
+    "(income|expense)\\s*[:：]\\s*[0-9,]+(?:\\.[0-9]+)?"
+  ],
+
+  // Transaction parsing patterns.
+  //
+  // IMPORTANT:
+  // - Patterns use the `(?<name>...)` named-group syntax (PCRE-style).
+  // - The Python code will rewrite it to Python's `(?P<name>...)` at runtime.
+  //
+  // Recommended named groups:
+  // - card_last4, month, day, time, direction, biz_type, channel, merchant, amount, balance
+  "transaction_patterns": [
+    {
+      "name": "example_english_template",
+      "description": "Card ****1234 03/30 19:47 Expense (CardPayment-VendorName) 12.60, Balance 37964.38",
+      "regex": "^Card\\s+\\*{2,}(?<card_last4>\\d{4})\\s+(?<month>\\d{1,2})\\/(?<day>\\d{1,2})\\s+(?<time>\\d{1,2}:\\d{2})\\s+(?<direction>Expense|Income)\\s+\\((?<biz_type>[^\\-\\)]*)(?<channel>[^\\-\\)]*?)(?:-(?<merchant>.*))?\\)\\s+(?<amount>[0-9,]+(?:\\.[0-9]+)?)\\,\\s*Balance\\s+(?<balance>[0-9,]+(?:\\.[0-9]+)?)$",
+      "direction_map": {
+        "Expense": "expense",
+        "Income": "income"
+      }
+    },
+    {
+      "name": "example_catchall_bracket",
+      "description": "Catch-all: parse a bracket field and let code heuristics split merchant/channel when needed.",
+      "regex": "^Card\\s+\\*{2,}(?<card_last4>\\d{4})\\s+(?<month>\\d{1,2})\\/(?<day>\\d{1,2})\\s+(?<time>\\d{1,2}:\\d{2})\\s+(?<direction>Expense|Income)\\s+\\((?<bracket>.*)\\)\\s+(?<amount>[0-9,]+(?:\\.[0-9]+)?)\\,\\s*Balance\\s+(?<balance>[0-9,]+(?:\\.[0-9]+)?)$",
+      "direction_map": {
+        "Expense": "expense",
+        "Income": "income"
+      }
+    }
+  ],
+
+  // Category ordering used by reports/exports (optional).
+  "category_taxonomy": {
+    "all": [
+      "Salary",
+      "Reimbursement",
+      "Transfer",
+      "Food",
+      "Groceries",
+      "Transport",
+      "Shopping",
+      "Subscriptions",
+      "Bank fees",
+      "Other (Needs review)"
+    ]
+  },
+
+  // Default category used when nothing matches.
+  "defaults": { "unknown_category": "Other (Needs review)" },
+
+  // Category rules.
+  // Match conditions are evaluated against the parsed transaction fields + the full message content.
+  //
+  // Supported match keys (see qbillrecord/parse/icbc95588.py: rule_matches):
+  // - if_direction_in: ["expense","income"] (derived direction) or ["Expense","Income"] (raw direction)
+  // - if_biz_type_in, if_channel_in
+  // - if_merchant_matches_any: ["Uber","Starbucks"]
+  // - if_text_matches_any: ["some substring"]
+  "category_rules": [
+    {
+      "if_text_matches_any": ["PAYROLL", "Salary"],
+      "set_category": "Salary"
+    },
+    {
+      "if_merchant_matches_any": ["Uber", "Lyft", "Metro"],
+      "set_category": "Transport"
+    },
+    {
+      "if_merchant_matches_any": ["Starbucks", "McDonald's", "Restaurant"],
+      "set_category": "Food"
+    }
+  ],
+
+  // Optional tag rules (not required by the parser; used by some exporters).
+  "tags_rules": [
+    { "if_text_matches_any": ["Apple"], "add_tags": ["apple"] },
+    { "if_text_matches_any": ["Google"], "add_tags": ["google"] }
+  ]
+}
+

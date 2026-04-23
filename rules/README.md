@@ -37,6 +37,9 @@ python3 -m qbillrecord run --pipeline pipelines/qbillrecord_icbc95588_inc.yml
 
 ## 4) Rule file
 
+- Copy `rules/icbc_95588_rules.example.json` to `rules/icbc_95588_rules.json` and edit it for your bank/SMS template.
+  - A commented variant is provided as `rules/icbc_95588_rules.example.jsonc` (for humans only).
+
 - `rules/icbc_95588_rules.json`
   - `ignore_if_text_matches_any`: keywords for non-transaction messages to ignore (OTP/security/login alerts, etc.)
   - `transaction_patterns`: regex patterns for parsing transaction messages (expense/income, channel, merchant, amount, balance, card last4, timestamp)
@@ -51,5 +54,4 @@ This ruleset is designed for the message formats commonly used by sender `95588`
 - Balance change (expense/income)
 - Non-transaction notifications that should be ignored (OTP/security reminders, etc.)
 
-Note: the exact SMS templates are in Chinese. The rules keep these templates as-is so the parser can match real messages.
-
+Note: rule files should match your real message templates and language (Chinese, English, etc.).

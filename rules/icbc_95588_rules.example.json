@@ -1,0 +1,46 @@
+{
+  "ignore_if_text_matches_any": ["OTP", "verification code", "security alert", "login", "password"],
+  "force_parse_if_text_matches_any_regex": [
+    "balance\\s*[:：]\\s*[0-9,]+(?:\\.[0-9]+)?",
+    "(income|expense)\\s*[:：]\\s*[0-9,]+(?:\\.[0-9]+)?"
+  ],
+  "transaction_patterns": [
+    {
+      "name": "example_english_template",
+      "description": "Card ****1234 03/30 19:47 Expense (CardPayment-VendorName) 12.60, Balance 37964.38",
+      "regex": "^Card\\s+\\*{2,}(?<card_last4>\\d{4})\\s+(?<month>\\d{1,2})\\/(?<day>\\d{1,2})\\s+(?<time>\\d{1,2}:\\d{2})\\s+(?<direction>Expense|Income)\\s+\\((?<biz_type>[^\\-\\)]*)(?<channel>[^\\-\\)]*?)(?:-(?<merchant>.*))?\\)\\s+(?<amount>[0-9,]+(?:\\.[0-9]+)?)\\,\\s*Balance\\s+(?<balance>[0-9,]+(?:\\.[0-9]+)?)$",
+      "direction_map": { "Expense": "expense", "Income": "income" }
+    },
+    {
+      "name": "example_catchall_bracket",
+      "description": "Catch-all: parse a bracket field and let code heuristics split merchant/channel when needed.",
+      "regex": "^Card\\s+\\*{2,}(?<card_last4>\\d{4})\\s+(?<month>\\d{1,2})\\/(?<day>\\d{1,2})\\s+(?<time>\\d{1,2}:\\d{2})\\s+(?<direction>Expense|Income)\\s+\\((?<bracket>.*)\\)\\s+(?<amount>[0-9,]+(?:\\.[0-9]+)?)\\,\\s*Balance\\s+(?<balance>[0-9,]+(?:\\.[0-9]+)?)$",
+      "direction_map": { "Expense": "expense", "Income": "income" }
+    }
+  ],
+  "category_taxonomy": {
+    "all": [
+      "Salary",
+      "Reimbursement",
+      "Transfer",
+      "Food",
+      "Groceries",
+      "Transport",
+      "Shopping",
+      "Subscriptions",
+      "Bank fees",
+      "Other (Needs review)"
+    ]
+  },
+  "defaults": { "unknown_category": "Other (Needs review)" },
+  "category_rules": [
+    { "if_text_matches_any": ["PAYROLL", "Salary"], "set_category": "Salary" },
+    { "if_merchant_matches_any": ["Uber", "Lyft", "Metro"], "set_category": "Transport" },
+    { "if_merchant_matches_any": ["Starbucks", "McDonald's", "Restaurant"], "set_category": "Food" }
+  ],
+  "tags_rules": [
+    { "if_text_matches_any": ["Apple"], "add_tags": ["apple"] },
+    { "if_text_matches_any": ["Google"], "add_tags": ["google"] }
+  ]
+}
+

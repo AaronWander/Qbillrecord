@@ -3,7 +3,7 @@ flowchart LR
 
   subgraph Inputs[Inputs]
     chatdb[(macOS Messages chat.db)]
-    rules[(rules/icbc_95588_rules.json)]
+    rules[(rules/icbc_95588_rules.example.json)]
     env[(.env)]
     state[(exports/95588_state.json)]
   end
@@ -48,4 +48,3 @@ flowchart LR
   validate_export --> run_dir
   pipeline --> run_dir
   push_state --> run_dir
-
