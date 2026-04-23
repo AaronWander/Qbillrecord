@@ -1,10 +1,10 @@
-# 短信记账规则（95588 / 工商银行）
+# SMS bookkeeping rules (95588 / ICBC)
 
-本目录用于存放“短信 → 结构化交易”的解析规则与分类映射，方便后续对接 Firefly III/YNAB 等记账软件 API。
+This directory contains parsing + classification rules that convert SMS messages into structured transactions, which can then be exported/pushed to bookkeeping systems such as Firefly III.
 
-## 1) 数据来源（iMessage / chat.db）
+## 1) Data source (macOS iMessage / `chat.db`)
 
-你提供的查询命令可以直接查看 95588 的短信：
+Example query to view recent messages from sender `95588`:
 
 ```sh
 sqlite3 ~/Library/Messages/chat.db "
@@ -18,57 +18,38 @@ WHERE handle.id LIKE '%95588%'
 ORDER BY message.date DESC;"
 ```
 
-## 导出为 JSONL（推荐用于规则分析）
+## 2) Export to JSONL
 
-把 95588 全量消息导出为 `jsonl`（每行一个 JSON，包含 `text`、解码后的 `attributedBody`、以及合并后的 `content`）：
+Run the pipeline to export messages and generate artifacts under `exports/runs/<timestamp>/`:
 
 ```sh
 cd <repo-root>
 python3 -m qbillrecord run --pipeline pipelines/qbillrecord_icbc95588_inc.yml
 ```
 
-只导出最近 N 条（调试用）：
+## 3) Export to Firefly III JSONL
+
+The same pipeline produces a Firefly III JSONL file (per-run) that contains `POST /api/v1/transactions` payloads:
 
 ```sh
 python3 -m qbillrecord run --pipeline pipelines/qbillrecord_icbc95588_inc.yml
 ```
 
-## 导出为 Firefly III 写入格式（JSONL）
-
-基于当前 `rules` 把每条“余额变动短信”转换成 Firefly III `POST /v1/transactions` 的 payload（口径B：按商户/对方自动建账户；分类仅“收入/支出”；“工资薪酬”等细分作为 tags）：
-
-```sh
-python3 -m qbillrecord run --pipeline pipelines/qbillrecord_icbc95588_inc.yml
-```
-
-### 1.1 为什么有的 `message.text` 为空？
-
-iMessage 里有些消息的可见文本只存放在 `message.attributedBody`（富文本归档字段），此时 `message.text` 会是 `NULL`。
-
-如果你想把这些 `attributedBody` 里的文本也解出来，可用：
-
-```sh
-# This legacy script was removed during the CLI rebuild.
-```
-
-## 2) 规则文件
+## 4) Rule file
 
 - `rules/icbc_95588_rules.json`
-  - `ignore_if_text_matches_any`：安全/验证码/登录提醒等非账务短信的过滤关键词
-  - `transaction_patterns`：余额变动类短信的正则解析（支出/收入、渠道、商户、金额、余额、卡尾号、发生时间）
-  - `category_taxonomy`：分类体系（目前已先固定“收入”大类下的子类）
-  - `category_rules`：根据商户/业务类型做分类建议（无法识别则进 `待分类` 并打 `needs_review`）
-  - `tags_rules`：按支付渠道打标签（财付通/支付宝/拼多多等）
+  - `ignore_if_text_matches_any`: keywords for non-transaction messages to ignore (OTP/security/login alerts, etc.)
+  - `transaction_patterns`: regex patterns for parsing transaction messages (expense/income, channel, merchant, amount, balance, card last4, timestamp)
+  - `category_taxonomy`: category list/taxonomy
+  - `category_rules`: merchant/biz-type based category suggestions; unresolved items remain “needs review”
+  - `tags_rules`: tags derived from channel/provider (e.g. Tenpay/Alipay/Pinduoduo)
 
-## 3) 当前基于样本已覆盖的短信形态
+## 5) Covered message shapes (examples)
 
-余额变动（支出/收入）：
+This ruleset is designed for the message formats commonly used by sender `95588` and covers patterns such as:
 
-- `尾号xxxx卡M月D日HH:MM支出(消费财付通-商户)xx.xx元，余额xx.xx元`
-- `尾号xxxx卡M月D日HH:MM收入(退款财付通-说明)xx元，余额xx.xx元`
-- `尾号xxxx卡M月D日HH:MM支出(缴费财付通-说明)0.17元，余额xx.xx元`
-- `尾号xxxx卡M月D日HH:MM工商银行支出(信使展期服务费)3元，余额xx.xx元`
+- Balance change (expense/income)
+- Non-transaction notifications that should be ignored (OTP/security reminders, etc.)
 
-非账务短信（应忽略）：
+Note: the exact SMS templates are in Chinese. The rules keep these templates as-is so the parser can match real messages.
 
-- 动态密码/验证码/快捷支付开通/登录安全提醒/工银信使服务变更等
