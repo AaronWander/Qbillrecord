@@ -26,6 +26,7 @@ backup.zip
 # Personal rule sets (may contain personal data / samples)
 rules/*.local.json
 rules/*.private.json
+rules/icbc_95588_rules.json
 
 # Logs / temp
 *.log
