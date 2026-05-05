@@ -417,20 +417,51 @@ def extract_assistant_text(resp: dict[str, Any]) -> str:
 
 
 def try_parse_json(text: str) -> dict[str, Any] | None:
-    text = text.strip()
-    if not text:
+    """
+    Best-effort JSON extraction.
+
+    In practice, some models occasionally prepend explanations before the JSON
+    object, even when instructed not to. We try to recover by locating the
+    first JSON object/array and decoding from there.
+    """
+    s = (text or "").strip()
+    if not s:
         return None
+
     # If model wraps in ```json ...```, strip fences.
-    if text.startswith("```"):
-        text = re.sub(r"^```[a-zA-Z]*\s*", "", text)
-        text = re.sub(r"\s*```$", "", text)
-        text = text.strip()
+    if s.startswith("```"):
+        s = re.sub(r"^```[a-zA-Z]*\s*", "", s)
+        s = re.sub(r"\s*```$", "", s)
+        s = s.strip()
+
+    # Fast path: entire content is JSON.
     try:
-        obj = json.loads(text)
+        obj0 = json.loads(s)
+        return obj0 if isinstance(obj0, dict) else None
+    except Exception:
+        pass
+
+    # Recovery: find the first '{' or '[' and raw-decode from there.
+    starts: list[int] = []
+    for ch in ("{", "["):
+        pos = s.find(ch)
+        if pos != -1:
+            starts.append(pos)
+    if not starts:
+        return None
+
+    dec = json.JSONDecoder()
+    for start in sorted(starts):
+        try:
+            obj, end = dec.raw_decode(s[start:])
+        except Exception:
+            continue
         if isinstance(obj, dict):
             return obj
-    except Exception:
-        return None
+        # If it's an array, accept only if it looks like the expected shape.
+        # (The pipeline expects a dict with "results", so arrays are invalid.)
+        _ = end  # unused; kept for clarity
+
     return None
 
 
