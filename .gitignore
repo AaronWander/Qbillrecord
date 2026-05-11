@@ -28,6 +28,9 @@ rules/*.local.json
 rules/*.private.json
 rules/icbc_95588_rules.json
 
+# Personal pipeline configs (may include local paths / accounts)
+pipelines/qbillrecord_icbc95588_inc.yml
+
 # Logs / temp
 *.log
 tmp/

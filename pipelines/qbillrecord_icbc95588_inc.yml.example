@@ -8,6 +8,7 @@ state:
 source:
   type: imessage_sqlite
   sender: "95588"
+  # Customize this path for your machine.
   db_path: "~/Library/Messages/chat.db"
 
 classifier:
@@ -16,16 +17,20 @@ classifier:
   ai:
     enabled: true
     provider: openai_compatible
+    # Use an OpenAI-compatible gateway (e.g. DeepSeek or your own proxy).
+    # Configure via env vars referenced below.
     api: openai-responses
     base_url_env: DEEPSEEK_BASE_URL
     api_key_env: DEEPSEEK_API_KEY
     model_env: DEEPSEEK_MODEL
+    # When true, AI failure aborts before push/state update.
     fail_hard: true
 
 exporter:
   type: firefly_jsonl
   tz: "+08:00"
-  asset_prefix: "ICBC"
+  # Firefly asset account name becomes "<asset_prefix>(<last4>)"
+  asset_prefix: "工商银行"
 
 sink:
   type: firefly_api
