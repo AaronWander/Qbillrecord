@@ -25,7 +25,7 @@ classifier:
 exporter:
   type: firefly_jsonl
   tz: "+08:00"
-  asset_prefix: "ICBC"
+  asset_prefix: "工商银行"
 
 sink:
   type: firefly_api
