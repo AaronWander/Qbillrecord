@@ -1,18 +1,22 @@
-name: qbillrecord_icbc95588_inc
+name: qbillrecord_bank_sms_inc
 artifacts_dir: exports/runs
 
 state:
   type: rowid_watermark
-  path: exports/95588_state.json
+  # Local watermark file (choose any name you like)
+  path: exports/bank_state.json
 
 source:
   type: imessage_sqlite
-  sender: "95588"
+  # Bank SMS sender (short code / contact name), e.g. "95588"
+  sender: "BANK_SENDER"
   # Customize this path for your machine.
   db_path: "~/Library/Messages/chat.db"
 
 classifier:
   type: icbc95588_rules_ai
+  # Provide your own rules file locally (this repo ignores the default rules file
+  # because it may contain personal samples).
   rules_path: rules/icbc_95588_rules.json
   ai:
     enabled: true
@@ -30,7 +34,7 @@ exporter:
   type: firefly_jsonl
   tz: "+08:00"
   # Firefly asset account name becomes "<asset_prefix>(<last4>)"
-  asset_prefix: "工商银行"
+  asset_prefix: "BANK"
 
 sink:
   type: firefly_api
