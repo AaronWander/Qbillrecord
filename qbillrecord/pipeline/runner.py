@@ -72,6 +72,20 @@ class RunResult:
     run_dir: Path
 
 
+def _classify_run_exception(e: Exception) -> tuple[str, str]:
+    msg = str(e or "").strip()
+    low = msg.lower()
+    if isinstance(e, ConfigError):
+        return "config_error", ""
+    if "permission denied" in low:
+        return "permission_denied", "Check filesystem permissions / macOS privacy settings (Messages DB access, etc.)."
+    if "no such file" in low or "not found" in low:
+        return "not_found", "Check configured paths (e.g. source.db_path, rules_path) and that files exist."
+    if "timeout" in low or "timed out" in low:
+        return "timeout", "Operation timed out; retry or increase timeouts if supported by the step."
+    return "exception", ""
+
+
 def run_pipeline(cfg: PipelineConfig) -> RunResult:
     """
     v1 runner: supports the built-in pipeline types declared in `pipelines/icbc95588_inc.yml`.
@@ -152,12 +166,24 @@ def run_pipeline(cfg: PipelineConfig) -> RunResult:
         manifest=manifest,
     )
 
-    src_meta = source_step.export(ctx=ctx, state=state_obj)
+    try:
+        src_meta = source_step.export(ctx=ctx, state=state_obj)
+    except Exception as e:
+        err_type, hint = _classify_run_exception(e)
+        manifest["error"] = {"step": "source", "type": err_type, "message": str(e)}
+        _write_manifest(2)
+        print(f"[run] step_failed step=source error_type={err_type} message={e}", file=sys.stderr, flush=True)
+        if hint:
+            print(f"[run] hint: {hint}", file=sys.stderr, flush=True)
+        return RunResult(rc=2, run_dir=run_dir)
     manifest["source"] = {"type": source_type, **(src_meta or {})}
     new_max = int((src_meta or {}).get("rowid_max") or 0)
     if int((src_meta or {}).get("alerts") or 0) > 0:
         _write_manifest(2)
-        print("[run] export anomalies found; abort before transform/push/state update.", file=sys.stderr, flush=True)
+        alerts_path = (src_meta or {}).get("alerts_path")
+        extra = f" alerts_path={alerts_path}" if alerts_path else ""
+        manifest["error"] = {"step": "source", "type": "export_alerts", "alerts": int((src_meta or {}).get("alerts") or 0), "alerts_path": alerts_path}
+        print(f"[run] export anomalies found{extra}; abort before transform/push/state update.", file=sys.stderr, flush=True)
         return RunResult(rc=2, run_dir=run_dir)
     if new_max <= last_rowid:
         _write_manifest(0)
@@ -168,7 +194,18 @@ def run_pipeline(cfg: PipelineConfig) -> RunResult:
     from qbillrecord.transform.icbc95588_pipeline import run_pipeline as transform_run
 
     _ensure_dir(audit_dir)
-    pipe_rc = int(transform_step.run(ctx=ctx) or 0)
+    try:
+        pipe_rc = int(transform_step.run(ctx=ctx) or 0)
+    except Exception as e:
+        err_type, hint = _classify_run_exception(e)
+        manifest["transform"] = {"type": transform_type, "rc": 2, "firefly_out": str(ctx.firefly_path), "audit_dir": str(audit_dir)}
+        manifest["error"] = {"step": "transform", "type": err_type, "message": str(e)}
+        _write_manifest(2)
+        print(f"[run] step_failed step=transform error_type={err_type} message={e}", file=sys.stderr, flush=True)
+        if hint:
+            print(f"[run] hint: {hint}", file=sys.stderr, flush=True)
+        print("[run] abort before push/state update.", file=sys.stderr, flush=True)
+        return RunResult(rc=2, run_dir=run_dir)
     manifest["transform"] = {"type": transform_type, "rc": pipe_rc, "firefly_out": str(ctx.firefly_path), "audit_dir": str(audit_dir)}
     if pipe_rc != 0:
         _write_manifest(pipe_rc)
@@ -176,13 +213,33 @@ def run_pipeline(cfg: PipelineConfig) -> RunResult:
         return RunResult(rc=pipe_rc, run_dir=run_dir)
 
     # 4) Sink: push to Firefly
-    summary = sink_step.push(ctx=ctx)
-    manifest["sink"] = {"type": sink_type, "push_state": str(ctx.push_state_path), "summary": summary}
+    try:
+        summary = sink_step.push(ctx=ctx)
+        manifest["sink"] = {"type": sink_type, "push_state": str(ctx.push_state_path), "summary": summary}
+    except Exception as e:
+        err_type, hint = _classify_run_exception(e)
+        manifest["sink"] = {"type": sink_type, "push_state": str(ctx.push_state_path), "summary": None}
+        manifest["error"] = {"step": "sink", "type": err_type, "message": str(e)}
+        _write_manifest(2)
+        print(f"[run] step_failed step=sink error_type={err_type} message={e}", file=sys.stderr, flush=True)
+        if hint:
+            print(f"[run] hint: {hint}", file=sys.stderr, flush=True)
+        print("[run] abort before state update.", file=sys.stderr, flush=True)
+        return RunResult(rc=2, run_dir=run_dir)
 
     # 5) Update watermark state
     if isinstance(state_obj, dict):
         state_obj["last_rowid"] = new_max
-    state_store.save(state_obj)
+    try:
+        state_store.save(state_obj)
+    except Exception as e:
+        err_type, hint = _classify_run_exception(e)
+        manifest["error"] = {"step": "state", "type": err_type, "message": str(e)}
+        _write_manifest(2)
+        print(f"[run] step_failed step=state error_type={err_type} message={e}", file=sys.stderr, flush=True)
+        if hint:
+            print(f"[run] hint: {hint}", file=sys.stderr, flush=True)
+        return RunResult(rc=2, run_dir=run_dir)
     manifest["state"]["new_last_rowid"] = int(new_max)
 
     _write_manifest(0)

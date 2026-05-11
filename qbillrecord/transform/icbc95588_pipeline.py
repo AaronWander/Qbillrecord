@@ -259,6 +259,13 @@ def validate_ai_response_records(
 
     for record in response_records:
         if record.get("error"):
+            # Include a short detail snippet so the top-level log is actionable.
+            detail = str(record.get("error_detail") or record.get("message") or "").strip()
+            if detail:
+                detail = detail.replace("\r", " ").replace("\n", " ")
+                if len(detail) > 240:
+                    detail = detail[:240] + "...(truncated)"
+                return False, f"ai_request_failed:{record.get('error')}:{detail}"
             return False, f"ai_request_failed:{record.get('error')}"
         parsed = record.get("parsed")
         if not isinstance(parsed, dict):
@@ -430,6 +437,10 @@ def _run(args: argparse.Namespace) -> int:
             )
         base_url = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com").strip()
         model = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat").strip()
+        api_mode = (os.environ.get("DEEPSEEK_API", "") or "").strip()
+        if not api_mode:
+            api_mode = "openai-chat-completions"
+        print(f"[3/4] ai provider=deepseek base_url={base_url} api={api_mode} model={model}", file=sys.stderr, flush=True)
 
         system_prompt = (
             "你是记账分类助手。你必须只输出 JSON，不能输出任何额外文本。"
@@ -520,19 +531,37 @@ def _run(args: argparse.Namespace) -> int:
             except Exception as e:
                 record["error"] = f"exception:{type(e).__name__}"
                 record["message"] = str(e)
+                err_detail = record["message"]
+                err_type = "unknown"
+                err_hint = ""
+                msg = str(e)
+                if "HTTP 401" in msg or " 401" in msg:
+                    err_type = "auth_401"
+                    err_hint = "Check `DEEPSEEK_API_KEY` and `DEEPSEEK_BASE_URL` (expired/wrong key or wrong gateway path)."
+                elif "HTTP 429" in msg or " 429" in msg:
+                    err_type = "rate_limit_429"
+                    err_hint = "Rate limited. Consider increasing `--sleep-ms`, reducing `--batch-size`, or retry later."
+                elif "HTTP 500" in msg or " 500" in msg:
+                    err_type = "server_5xx"
+                    err_hint = "Upstream server error. Often transient; retry later or check gateway status."
+                elif "RemoteDisconnected" in msg:
+                    err_type = "remote_disconnected"
+                    err_hint = "Remote closed connection. Often transient or a gateway/proxy idle timeout; retry later or lower `--timeout-s`."
+                elif "timed out" in msg.lower() or "timeout" in msg.lower():
+                    err_type = "timeout"
+                    err_hint = "Request timed out. Consider increasing `--timeout-s` or lowering `--batch-size`."
+                record["error_type"] = err_type
+                record["error_detail"] = err_detail
+                record["hint"] = err_hint
                 record["latency_ms"] = int((time.time() - started) * 1000)
                 print(
                     f"{label} done: ERROR {record['error']} latency_ms={record['latency_ms']} message={record.get('message','')}",
                     file=sys.stderr,
                     flush=True,
                 )
-                msg = str(e)
-                if "HTTP 401" in msg or " 401" in msg:
-                    print(
-                        f"{label} hint: DeepSeek returned 401. Re-check `DEEPSEEK_API_KEY` (expired/wrong key) and `DEEPSEEK_BASE_URL`.",
-                        file=sys.stderr,
-                        flush=True,
-                    )
+                print(f"{label} classify_error_type={err_type}", file=sys.stderr, flush=True)
+                if err_hint:
+                    print(f"{label} hint: {err_hint}", file=sys.stderr, flush=True)
             finally:
                 if hb_stop is not None:
                     hb_stop.set()
